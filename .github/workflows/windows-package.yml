@@ -5,9 +5,11 @@ on:
   push:
     tags:
       - 'v*'
+  release:
+    types: [published]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   package:
@@ -23,6 +25,8 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -99,3 +103,13 @@ jobs:
             dist/pomoterra-windows-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
+
+      - name: Attach package to GitHub Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh release upload "$env:RELEASE_TAG" dist/pomoterra-windows-x64.zip dist/pomoterra-windows-x64.zip.sha256 --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Uploading release assets failed' }
