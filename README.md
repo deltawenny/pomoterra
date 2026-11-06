@@ -149,9 +149,14 @@ Publish a GitHub Release to automatically build and attach the Windows ZIP and
 its SHA-256 checksum to that release. The workflow checks out the release's tag;
 rerunning it replaces the matching release assets.
 
+Push a stable semantic version tag such as `v0.1.0` (`vMAJOR.MINOR.PATCH`) to
+build the package, create a GitHub Release with generated notes if it does not
+already exist, and attach the ZIP and checksum. Keep the tag version aligned
+with the package version in `Cargo.toml`.
+
 You can also run **Windows package** from the repository's GitHub **Actions** tab
-using **Run workflow**, or push a version tag matching `v*`. These runs upload
-workflow artifacts only, without creating or modifying a GitHub Release. The workflow builds the
+using **Run workflow**. Manual branch runs upload workflow artifacts only;
+manual runs against a version tag also publish release assets. The workflow builds the
 native Rust desktop launcher on `windows-latest` for `x86_64-pc-windows-msvc`,
 with release LTO and stripped symbols. It does not use Linux cross-packaging.
 
