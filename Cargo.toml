@@ -10,6 +10,7 @@ publish = false
 nsh-core = { version = "0.4.0", features = ["svg"] }
 nsh-base = "0.4.0"
 env_logger = "0.11"
+chrono = "0.4"
 lucide-icons = "=1.70.0"
 
 [build-dependencies]

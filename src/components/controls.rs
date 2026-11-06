@@ -48,7 +48,13 @@ fn session_counter(timer: Signal<TimerState>) -> View {
         .flex_shrink_0()
         .items_center()
         .gap(px(3.0))
-        .child(text(move || format!("{} / 4", timer.get().session)).text_size(px(14.0)))
+        .child(
+            text(move || {
+                let state = timer.get();
+                format!("{} / {}", state.session, state.rules.rounds)
+            })
+            .text_size(px(14.0)),
+        )
         .child(text("Sessions").text_size(px(14.0)))
 }
 

@@ -1,9 +1,10 @@
-//! A compact, single-tab Pomodoro timer.
+//! A compact Pomodoro timer with configurable rules and scheduled breaks.
 mod components;
 mod icons;
 mod store;
 
-use components::{GREY, session_note, tab_header, timer_controls, timer_display};
+use chrono::{Datelike, Local, Timelike};
+use components::{GREY, Tab, config_tab, session_note, tab_header, timer_controls, timer_display};
 use nsh_core::prelude::*;
 use std::time::{Duration, Instant};
 use store::TimerState;
@@ -32,7 +33,7 @@ fn constrain_window_size() {
     });
 }
 
-/// The sole Timer tab; the operating system supplies the window chrome.
+/// The operating system supplies the window chrome.
 #[component]
 pub fn App() -> impl IntoElement {
     #[cfg(target_os = "linux")]
@@ -40,11 +41,21 @@ pub fn App() -> impl IntoElement {
 
     let timer = signal(TimerState::default());
     let announcements = signal(true);
+    let selected = signal(Tab::Timer);
 
     set_interval(Duration::from_millis(200), move || {
         if timer.get().running {
             let mut finished = false;
-            timer.update(|state| finished = state.tick(Instant::now()));
+            timer.update(|state| {
+                let now = Instant::now();
+                finished = state.tick(now);
+                let local = Local::now();
+                state.check_special_break(
+                    local.date_naive().num_days_from_ce(),
+                    local.hour() * 60 + local.minute(),
+                    now,
+                );
+            });
             if finished && announcements.get() {
                 announce_for_accessibility("Session complete. Your next session is ready.");
             }
@@ -56,15 +67,26 @@ pub fn App() -> impl IntoElement {
         .bg(rgb(0xffffff))
         .text_color(rgb(GREY))
         .p_safe_area()
-        .child(tab_header(timer))
-        .child(timer_display(timer))
+        .child(tab_header(selected))
         .child(
             view()
-                .px(px(16.0))
-                .pb(px(17.0))
-                .flex_shrink_0()
-                .gap(px(18.0))
-                .child(session_note(timer))
-                .child(timer_controls(timer, announcements)),
+                .flex_1()
+                .style_when(move || selected.get() != Tab::Config, |s| s.hidden())
+                .child(config_tab(timer)),
+        )
+        .child(
+            view()
+                .flex_1()
+                .style_when(move || selected.get() != Tab::Timer, |s| s.hidden())
+                .child(timer_display(timer))
+                .child(
+                    view()
+                        .px(px(16.0))
+                        .pb(px(17.0))
+                        .flex_shrink_0()
+                        .gap(px(18.0))
+                        .child(session_note(timer))
+                        .child(timer_controls(timer, announcements)),
+                ),
         )
 }

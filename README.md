@@ -1,17 +1,30 @@
 # pomoterra
 
-A compact, single-tab Pomodoro timer written in Rust. Its UI is `src/lib.rs`, and `nsh.json` names the root component (`"root": "App"`).
+A compact Pomodoro timer written in Rust with Timer and Config tabs. Its UI is `src/lib.rs`, and `nsh.json` names the root component (`"root": "App"`).
 
 ## Timer
 
 The Timer view has a blue countdown ring, a session note, and start/pause, reset,
-skip, announcement, and full-screen controls. Focus sessions last 45 minutes;
+skip, announcement, and full-screen controls. Focus sessions default to 25 minutes;
 breaks last 5 minutes, with a 15-minute break after every fourth focus session.
 The next session waits for you to press Start. Reset restarts the current phase.
 
 Click the three dots to edit or save a session note. The speaker control toggles
 screen-reader completion announcements (not an audio alarm). Notes and timer
 state are kept in memory for the current app run.
+
+## Config
+
+The Config tab adjusts focus time (1–120 minutes), short and long breaks
+(1–60 minutes), and session rounds (1–10). Sliders support dragging and keyboard
+arrows. Changing a rule resets the timer to the first focus session. Restore
+Default resets the rules to 25/5/15 minutes and four rounds, and clears special breaks.
+
+Four optional special breaks each accept a local 24-hour start time (`HH:MM`)
+and a duration of 1–180 minutes. Incomplete or invalid entries have a red border
+and do not run. A matching time interrupts an active focus session once per day;
+after the break, the remaining focus time is ready to resume. Schedules only
+run while the app is open. Rules and schedules are kept in memory for this app run.
 
 Timer-state tests live in `src/store.rs`; `App.test.tsx` tests the UI controls.
 
