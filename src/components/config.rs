@@ -69,6 +69,7 @@ pub(crate) fn config_tab(
                 .child(special_row(timer, 0))
                 .child(special_row(timer, 2)),
         )
+        .child(view().h(px(24.0)).flex_shrink_0())
 }
 
 fn section_title(label: &'static str) -> Text {

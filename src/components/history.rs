@@ -43,6 +43,8 @@ fn date(session: &Session) -> NaiveDate {
 pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
     let period = signal(Period::Week);
     let profile = signal(0_i64);
+    let from_date = signal(String::new());
+    let to_date = signal(String::new());
     let oldest = signal(false);
     let preview = signal(None::<Vec<Session>>);
     let displayed_sessions = move || preview.get().unwrap_or_else(|| library.get().sessions);
@@ -63,35 +65,61 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
             .child(when(move || preview.get().is_some(), || {
                 text("Sample preview only · saved history is unchanged.").text_size(px(11.0)).text_color(rgb(BLUE))
             })))
-        .child(view().flex_row().gap(px(6.0)).children([
-            (Period::Today, "Today"), (Period::Week, "Week"), (Period::Month, "Month"), (Period::Year, "Year"), (Period::All, "All")
-        ].into_iter().map(move |(value, title)| {
-            view().flex_1().py(px(7.0)).items_center().rounded(px(4.0))
-                .bg(move || rgb(if period.get() == value { 0xe7f4fc } else { 0xf6f6f6 }))
-                .role(AccessibilityRole::Button).label(format!("History: {title}"))
-                .on_press(move || period.set(value))
-                .child(text(title).text_size(px(11.0)).text_color(rgb(BLUE)))
-        })))
-        .child(combobox()
-            .items(move || {
-                let data = library.get();
-                let mut names: BTreeMap<i64, String> = displayed_sessions().iter().map(|s| (s.profile_id, s.profile_name.clone())).collect();
-                if preview.get().is_none() {
-                    names.extend(data.profiles.iter().map(|p| (p.id, p.name.clone())));
-                }
-                std::iter::once(SelectItem::new("0", "All profiles"))
-                    .chain(sorted_items(names.into_iter().map(|(id, name)| SelectItem::new(id.to_string(), name)))).collect::<Vec<_>>()
-            })
-            .value(move || Some(vec![profile.get().to_string().into()]))
-            .accessibility_label("History profile")
-            .placeholder("Search profiles")
-            .on_change(move |value: &Vec<SharedString>| { if let Some(id) = value.first().and_then(|v| v.parse().ok()) { profile.set(id); } }))
         .child(dynamic(move || calendar(&displayed_sessions(), profile.get())))
+        .child(view().gap(px(6.0))
+            .child(view().flex_row().gap(px(6.0)).children([
+                (Period::Today, "Today"), (Period::Week, "Week"), (Period::Month, "Month"), (Period::Year, "Year"), (Period::All, "All")
+            ].into_iter().map(move |(value, title)| {
+                view().flex_1().py(px(7.0)).items_center().rounded(px(4.0))
+                    .bg(move || rgb(if period.get() == value { 0xe7f4fc } else { 0xf6f6f6 }))
+                    .role(AccessibilityRole::Button).label(format!("History: {title}"))
+                    .on_press(move || period.set(value))
+                    .child(text(title).text_size(px(11.0)).text_color(rgb(BLUE)))
+            })))
+            .child(combobox()
+                .items(move || {
+                    let data = library.get();
+                    let mut names: BTreeMap<i64, String> = displayed_sessions().iter().map(|s| (s.profile_id, s.profile_name.clone())).collect();
+                    if preview.get().is_none() {
+                        names.extend(data.profiles.iter().map(|p| (p.id, p.name.clone())));
+                    }
+                    std::iter::once(SelectItem::new("0", "All profiles"))
+                        .chain(sorted_items(names.into_iter().map(|(id, name)| SelectItem::new(id.to_string(), name)))).collect::<Vec<_>>()
+                })
+                .value(move || Some(vec![profile.get().to_string().into()]))
+                .accessibility_label("History profile")
+                .placeholder("Search profiles")
+                .on_change(move |value: &Vec<SharedString>| { if let Some(id) = value.first().and_then(|v| v.parse().ok()) { profile.set(id); } }))
+            .child(view().flex_row().gap(px(6.0))
+                .child(super::input::text_input(move || {
+                    !from_date.get().trim().is_empty() && parse_date(&from_date.get()).is_none()
+                }).flex_1().label("From date").placeholder("YYYY-MM-DD").value(move || from_date.get()).on_change(move |value: &str| from_date.set(value.to_owned())))
+                .child(super::input::text_input(move || {
+                    !to_date.get().trim().is_empty() && parse_date(&to_date.get()).is_none()
+                }).flex_1().label("To date").placeholder("YYYY-MM-DD").value(move || to_date.get()).on_change(move |value: &str| to_date.set(value.to_owned())))))
         .child(dynamic(move || {
             let today = Local::now().date_naive();
             let start = period.get().start(today);
+            let from = parse_date(&from_date.get());
+            let to = parse_date(&to_date.get());
+            let from_entered = !from_date.get().trim().is_empty();
+            let to_entered = !to_date.get().trim().is_empty();
+            let from_valid = !from_entered || from.is_some();
+            let to_valid = !to_entered || to.is_some();
+            let custom_range = from_entered || to_entered;
             let mut sessions: Vec<_> = displayed_sessions().into_iter()
-                .filter(|s| (profile.get() == 0 || s.profile_id == profile.get()) && date(s) <= today && start.is_none_or(|start| date(s) >= start)).collect();
+                .filter(|s| {
+                    let session_date = date(s);
+                    from_valid && to_valid
+                        && (profile.get() == 0 || s.profile_id == profile.get())
+                        && session_date <= today
+                        && if custom_range {
+                            from.is_none_or(|from| session_date >= from)
+                                && to.is_none_or(|to| session_date <= to)
+                        } else {
+                            start.is_none_or(|start| session_date >= start)
+                        }
+                }).collect();
             if oldest.get() { sessions.reverse(); }
             let seconds: u64 = sessions.iter().map(|s| s.seconds).sum();
             let mut earnings: BTreeMap<String, i64> = BTreeMap::new();
@@ -107,6 +135,13 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
                 .child(when(move || empty, || text("No completed focus sessions in this period. Finish a focus session to start your history.").text_size(px(13.0)).text_color(rgb(GREY))))
                 .children(sessions.into_iter().map(session_row))
         })))
+}
+
+fn parse_date(value: &str) -> Option<NaiveDate> {
+    let value = value.trim();
+    (!value.is_empty())
+        .then(|| NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
+        .flatten()
 }
 
 fn calendar(sessions: &[Session], profile_id: i64) -> View {
