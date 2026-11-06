@@ -36,6 +36,35 @@ Windows. Install the backend's development libraries before building.
 The `nsh` commands build the app's runners from the NSH crates `Cargo.toml` depends on: crates.io's at the version of
 the `nsh` you run (keep the `nsh-*` dependencies at that version when you upgrade `nsh`), or an NSH checkout's by path.
 
+## Icons
+
+Use the [Lucide catalog](https://lucide.dev/icons/) through the pinned
+[lucide-icons crate](https://docs.rs/lucide-icons/1.70.0/lucide_icons/).
+All UI icons go through [`src/icons.rs`](src/icons.rs), which reexports the
+crate's typed catalog and renders decorative glyphs in a fixed square.
+Choose a catalog variant and pass its color and size in logical pixels to the
+shared renderer; existing examples are in [`src/lib.rs`](src/lib.rs).
+Keep the action's accessible label on the enclosing button. The renderer hides
+its glyph from assistive technologies so screen readers announce the action.
+
+To add an icon, select its matching Rust variant from the crate and use the
+shared renderer. Avoid inline SVG icon paths, Unicode literals, or a second
+icon library. The countdown ring remains custom SVG because it displays timer
+progress rather than a catalog icon.
+
+This crate supplies font glyphs rather than SVG paths. The renderer uses the
+bundled Lucide font, with size and color as its styling options. The direct
+desktop launcher registers the dependency's font bytes. [`build.rs`](build.rs)
+exposes those same bytes as an NSH font asset for generated runners, TSX entries,
+and packaging; no font needs installing on the user's machine. Keep the normal
+and build dependency versions identical when updating Lucide, then check icon
+appearance and run the existing UI tests.
+
+Lucide icons are ISC licensed, with Feather-derived portions under MIT; the
+Rust crate is MIT licensed. Attribution and license texts are included in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). Include these notices when
+redistributing the app and bundled font.
+
 ## Adding a TSX entry
 
 TSX screens can use the Rust components and modules, with hot reloading for the TSX. The crate's set,

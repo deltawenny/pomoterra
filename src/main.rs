@@ -13,12 +13,14 @@ use nsh_platform_windows as platform;
 fn main() -> impl std::process::Termination {
     env_logger::init();
     platform::run_app(
-        platform::AppSource::Rust(platform::Root::of::<nsh_app_pomoterra::App>()),
+        platform::AppSource::Rust(
+            platform::Root::of::<nsh_app_pomoterra::App>().font(lucide_icons::LUCIDE_FONT_BYTES),
+        ),
         platform::AppOptions {
             title: "Pomoterra".to_owned(),
             #[cfg(any(target_os = "linux", target_os = "windows"))]
             app_id: "com.example.pomoterra".to_owned(),
-            size: (340, 488),
+            size: (340, 515),
             ..Default::default()
         },
     )
