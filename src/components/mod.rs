@@ -13,6 +13,7 @@ pub(crate) use config::config_tab;
 pub(crate) use controls::timer_controls;
 pub(crate) use header::{Tab, tab_header};
 pub(crate) use history::history_tab;
+pub(crate) use profiles::profile_picker;
 pub(crate) use session_note::session_note;
 pub(crate) use timer_display::timer_display;
 

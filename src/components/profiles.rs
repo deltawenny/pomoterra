@@ -56,6 +56,33 @@ pub(crate) fn choose(
     });
 }
 
+pub(crate) fn profile_picker(
+    timer: Signal<TimerState>,
+    library: Signal<Library>,
+    active: Signal<i64>,
+    after_change: impl Fn() + 'static,
+) -> impl IntoElement {
+    combobox()
+        .items(move || {
+            sorted_items(
+                library
+                    .get()
+                    .profiles
+                    .iter()
+                    .map(|p| SelectItem::new(p.id.to_string(), p.name.clone())),
+            )
+        })
+        .value(move || Some(vec![active.get().to_string().into()]))
+        .accessibility_label("Configuration profile")
+        .placeholder("Search profiles")
+        .on_change(move |value: &Vec<SharedString>| {
+            if let Some(id) = value.first().and_then(|v| v.parse().ok()) {
+                choose(timer, library, active, id);
+                after_change();
+            }
+        })
+}
+
 pub(crate) fn profile_settings(
     timer: Signal<TimerState>,
     library: Signal<Library>,
@@ -76,17 +103,10 @@ pub(crate) fn profile_settings(
     view().gap(px(10.0)).mb(px(26.0))
         .child(text("Configuration Profile").text_size(px(12.0)).text_color(rgb(0x333333)))
         .child(view().flex_row().items_center().gap(px(4.0))
-            .child(view().flex_1().min_w(px(0.0)).child(combobox()
-                .items(move || sorted_items(library.get().profiles.iter().map(|p| SelectItem::new(p.id.to_string(), p.name.clone()))))
-                .value(move || Some(vec![active.get().to_string().into()]))
-                .accessibility_label("Configuration profile")
-                .placeholder("Search profiles")
-                .on_change(move |value: &Vec<SharedString>| {
-                    if let Some(id) = value.first().and_then(|v| v.parse().ok()) {
-                        choose(timer, library, active, id);
-                        editing.set(false); deleting.set(false);
-                    }
-                })))
+            .child(view().flex_1().min_w(px(0.0)).child(profile_picker(timer, library, active, move || {
+                editing.set(false);
+                deleting.set(false);
+            })))
             .child(action("Add profile", Icon::Plus, move || {
                 let data = library.get();
                 let result = data.database.as_ref().ok_or_else(|| "Storage unavailable".to_owned())

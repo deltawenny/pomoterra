@@ -9,7 +9,8 @@ mod desktop;
 
 use chrono::{Datelike, Local, Timelike};
 use components::{
-    GREY, Tab, config_tab, history_tab, session_note, tab_header, timer_controls, timer_display,
+    GREY, Tab, config_tab, history_tab, profile_picker, session_note, tab_header, timer_controls,
+    timer_display,
 };
 use nsh_core::prelude::*;
 use persistence::Library;
@@ -182,19 +183,11 @@ pub fn App() -> impl IntoElement {
                 .flex_1()
                 .style_when(move || selected.get() != Tab::Timer, |s| s.hidden())
                 .child(
-                    text(move || {
-                        library
-                            .get()
-                            .profiles
-                            .iter()
-                            .find(|p| p.id == active.get())
-                            .map(|p| p.name.clone())
-                            .unwrap_or_default()
-                    })
-                    .text_size(px(12.0))
-                    .text_color(rgb(GREY))
-                    .px(px(20.0))
-                    .pt(px(8.0)),
+                    view()
+                        .px(px(16.0))
+                        .pt(px(8.0))
+                        .flex_shrink_0()
+                        .child(profile_picker(timer, library, active, || {})),
                 )
                 .child(timer_display(timer))
                 .child(
