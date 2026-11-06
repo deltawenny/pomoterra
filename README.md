@@ -143,6 +143,23 @@ Windows. Install the backend's development libraries before building.
 The `nsh` commands build the app's runners from the NSH crates `Cargo.toml` depends on: crates.io's at the version of
 the `nsh` you run (keep the `nsh-*` dependencies at that version when you upgrade `nsh`), or an NSH checkout's by path.
 
+## Windows release package
+
+Run **Windows package** from the repository's GitHub **Actions** tab using
+**Run workflow**, or push a version tag matching `v*`. The workflow builds the
+native Rust desktop launcher on `windows-latest` for `x86_64-pc-windows-msvc`,
+with release LTO and stripped symbols. It does not use Linux cross-packaging.
+
+Download the `pomoterra-windows-x64` artifact from the completed run. It contains
+`pomoterra-windows-x64.zip` and its SHA-256 checksum. Extract the ZIP before
+running `pomoterra.exe`; keep the included third-party notices when redistributing.
+The launcher embeds the Lucide font and uses the normal per-user database location.
+
+Packaging fails unless both the build output and the executable extracted from
+the ZIP have valid MZ/PE headers, AMD64 machine type, PE32+ format, and the Windows
+GUI subsystem. The extracted executable must also match the build output's hash.
+These are structural checks, not a Windows UI smoke test. The package is unsigned.
+
 ## Icons
 
 Use the [Lucide catalog](https://lucide.dev/icons/) through the pinned
