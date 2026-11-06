@@ -1,8 +1,16 @@
-//! SQLite storage for profiles and completed-focus records linked by profile ID.
-use std::{path::PathBuf, rc::Rc};
+//! Toasty-backed SQLite storage for profiles and completed-focus records.
+//! Toasty owns the schema; unreleased legacy layouts are not migrated.
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
+
+mod models;
+use models::{Setting, StoredProfile, StoredSession};
 
 use crate::store::{CompletedFocus, TimerRules};
-use rusqlite::{Connection, params};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Profile {
@@ -38,7 +46,11 @@ impl Session {
     }
 }
 
-pub struct Database(Connection);
+pub struct Database {
+    connection: RefCell<toasty::Connection>,
+    _db: toasty::Db,
+    runtime: tokio::runtime::Runtime,
+}
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -48,189 +60,243 @@ impl Database {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        Self::initialize(Connection::open(path).map_err(|e| e.to_string())?)
+        Self::open_path(&path)
     }
 
-    fn initialize(mut connection: Connection) -> Result<Self> {
-        connection
-            .busy_timeout(std::time::Duration::from_secs(3))
+    fn open_path(path: &Path) -> Result<Self> {
+        let driver = if path == Path::new(":memory:") {
+            toasty_driver_sqlite::Sqlite::in_memory()
+        } else {
+            toasty_driver_sqlite::Sqlite::open(path)
+        };
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
             .map_err(|e| e.to_string())?;
-        connection
-            .execute_batch(
-                "PRAGMA foreign_keys = ON;
-                 PRAGMA journal_mode = WAL;",
-            )
+        let (db, toasty_connection) = runtime
+            .block_on(async {
+                let db = toasty::Db::builder()
+                    .models(toasty::models!(StoredProfile, StoredSession, Setting))
+                    .max_pool_size(1)
+                    .build(driver)
+                    .await?;
+                let mut connection = db.connection().await?;
+                for pragma in ["PRAGMA foreign_keys = ON", "PRAGMA busy_timeout = 3000", "PRAGMA journal_mode = WAL"] {
+                    toasty::sql::query(pragma).exec(&mut connection).await?;
+                }
+                // push_schema creates a fresh schema, not an incremental migration.
+                // Leave existing databases untouched; unsupported development
+                // layouts surface as storage errors instead of being destroyed.
+                let tables = toasty::sql::query(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+                ).exec(&mut connection).await?;
+                if tables.is_empty() {
+                    connection.push_schema().await?;
+                }
+                Ok::<_, toasty::Error>((db, connection))
+            })
             .map_err(|e| e.to_string())?;
-        let transaction = connection
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(|e| e.to_string())?;
-        let version: i64 = transaction
-            .query_row("PRAGMA user_version", [], |row| row.get(0))
-            .map_err(|e| e.to_string())?;
-        if version > 2 {
-            return Err(format!(
-                "Unsupported database version {version}. Update Pomoterra."
-            ));
-        }
-        transaction
-            .execute_batch(
-                "CREATE TABLE IF NOT EXISTS profiles (
-                id INTEGER PRIMARY KEY, name TEXT NOT NULL, color TEXT NOT NULL,
-                payable INTEGER NOT NULL, rate INTEGER NOT NULL CHECK(rate >= 0),
-                currency TEXT NOT NULL, rules TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0
-             );
-             CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-             CREATE TABLE IF NOT EXISTS sessions (
-                id INTEGER PRIMARY KEY, profile_id INTEGER NOT NULL REFERENCES profiles(id),
-                started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL,
-                seconds INTEGER NOT NULL CHECK(seconds > 0), note TEXT NOT NULL,
-                rate INTEGER NOT NULL, currency TEXT NOT NULL
-             );",
-            )
-            .map_err(|e| e.to_string())?;
-        // Older databases stored profile name/color snapshots alongside the ID.
-        // Rebuild atomically, preserving session IDs and all historical billing data.
-        let legacy: bool = transaction
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('sessions') WHERE name='profile_name')",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(|e| e.to_string())?;
-        if legacy {
-            transaction
-                .execute_batch(
-                    "CREATE TABLE sessions_relational (
-                        id INTEGER PRIMARY KEY,
-                        profile_id INTEGER NOT NULL REFERENCES profiles(id),
-                        started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL,
-                        seconds INTEGER NOT NULL CHECK(seconds > 0), note TEXT NOT NULL,
-                        rate INTEGER NOT NULL, currency TEXT NOT NULL
-                     );
-                     INSERT INTO sessions_relational
-                        (id,profile_id,started_at,finished_at,seconds,note,rate,currency)
-                     SELECT id,profile_id,started_at,finished_at,seconds,note,rate,currency
-                     FROM sessions;
-                     DROP TABLE sessions;
-                     ALTER TABLE sessions_relational RENAME TO sessions;",
-                )
-                .map_err(|e| e.to_string())?;
-        }
-        transaction
-            .execute_batch(
-                "CREATE INDEX IF NOT EXISTS sessions_finished ON sessions(finished_at);
-                 CREATE INDEX IF NOT EXISTS sessions_profile ON sessions(profile_id);
-                 PRAGMA user_version = 2;",
-            )
-            .map_err(|e| e.to_string())?;
-        transaction.commit().map_err(|e| e.to_string())?;
-        let database = Self(connection);
+        let database = Self {
+            connection: RefCell::new(toasty_connection),
+            _db: db,
+            runtime,
+        };
         if database.profiles()?.is_empty() {
             database.create_profile("Default")?;
         }
         Ok(database)
     }
 
-    pub fn profiles(&self) -> Result<Vec<Profile>> {
-        let mut query = self.0.prepare("SELECT id,name,color,payable,rate,currency,rules FROM profiles WHERE archived=0 ORDER BY id").map_err(|e| e.to_string())?;
-        let rows = query
-            .query_map([], |row| {
-                let json: String = row.get(6)?;
-                let rules = serde_json::from_str(&json).map_err(|e| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        6,
-                        rusqlite::types::Type::Text,
-                        Box::new(e),
-                    )
-                })?;
-                Ok(Profile {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    color: row.get(2)?,
-                    payable: row.get(3)?,
-                    rate: row.get(4)?,
-                    currency: row.get(5)?,
-                    rules,
-                })
-            })
-            .map_err(|e| e.to_string())?;
-        rows.collect::<std::result::Result<Vec<_>, _>>()
+    fn run<T>(
+        &self,
+        operation: impl AsyncFnOnce(&mut toasty::Connection) -> toasty::Result<T>,
+    ) -> Result<T> {
+        self.runtime
+            .block_on(operation(&mut self.connection.borrow_mut()))
             .map_err(|e| e.to_string())
     }
 
+    pub fn profiles(&self) -> Result<Vec<Profile>> {
+        let mut rows = self.run(async |db| {
+            StoredProfile::all()
+                .filter(StoredProfile::fields().archived().eq(false))
+                .exec(db)
+                .await
+        })?;
+        rows.sort_by_key(|row| row.id);
+        rows.into_iter()
+            .map(|row| {
+                Ok(Profile {
+                    id: row.id,
+                    name: row.name,
+                    color: row.color,
+                    payable: row.payable,
+                    rate: row.rate,
+                    currency: row.currency,
+                    rules: serde_json::from_str(&row.rules).map_err(|e| e.to_string())?,
+                })
+            })
+            .collect()
+    }
+
     pub fn create_profile(&self, name: &str) -> Result<Profile> {
-        let mut profile = Profile {
-            id: 0,
-            name: name.into(),
-            color: "#0083c9".into(),
-            payable: false,
-            rate: 0,
-            currency: "USD".into(),
-            rules: TimerRules::default(),
-        };
-        self.0.execute("INSERT INTO profiles(name,color,payable,rate,currency,rules) VALUES (?1,?2,0,0,'USD',?3)", params![profile.name, profile.color, serde_json::to_string(&profile.rules).map_err(|e| e.to_string())?]).map_err(|e| e.to_string())?;
-        profile.id = self.0.last_insert_rowid();
-        Ok(profile)
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Profile name cannot be empty.".into());
+        }
+        let rules = TimerRules::default();
+        let json = serde_json::to_string(&rules).map_err(|e| e.to_string())?;
+        let row = self.run(async |db| {
+            StoredProfile::create()
+                .name(name)
+                .color("#0083c9")
+                .payable(false)
+                .rate(0_i64)
+                .currency("USD")
+                .rules(json)
+                .archived(false)
+                .exec(db)
+                .await
+        })?;
+        Ok(Profile {
+            id: row.id,
+            name: row.name,
+            color: row.color,
+            payable: row.payable,
+            rate: row.rate,
+            currency: row.currency,
+            rules,
+        })
     }
 
     pub fn save_profile(&self, profile: &Profile) -> Result<()> {
         if profile.name.trim().is_empty() {
             return Err("Profile name cannot be empty.".into());
         }
-        self.0.execute("UPDATE profiles SET name=?2,color=?3,payable=?4,rate=?5,currency=?6,rules=?7 WHERE id=?1", params![profile.id, profile.name.trim(), profile.color, profile.payable, profile.rate, profile.currency, serde_json::to_string(&profile.rules).map_err(|e| e.to_string())?]).map_err(|e| e.to_string())?;
-        Ok(())
+        if profile.rate < 0 {
+            return Err("Hourly rate cannot be negative.".into());
+        }
+        let rules = serde_json::to_string(&profile.rules).map_err(|e| e.to_string())?;
+        self.run(async |db| {
+            StoredProfile::filter_by_id(profile.id)
+                .update()
+                .name(profile.name.trim())
+                .color(profile.color.as_str())
+                .payable(profile.payable)
+                .rate(profile.rate)
+                .currency(profile.currency.as_str())
+                .rules(rules)
+                .exec(db)
+                .await?;
+            Ok(())
+        })
     }
 
     pub fn archive(&self, id: i64) -> Result<()> {
-        self.0
-            .execute("UPDATE profiles SET archived=1 WHERE id=?1", [id])
-            .map_err(|e| e.to_string())?;
-        Ok(())
+        self.run(async |db| {
+            StoredProfile::filter_by_id(id)
+                .update()
+                .archived(true)
+                .exec(db)
+                .await?;
+            Ok(())
+        })
     }
 
     pub fn select(&self, id: i64) -> Result<()> {
-        self.0.execute("INSERT INTO settings(key,value) VALUES ('active_profile',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [id.to_string()]).map_err(|e| e.to_string())?;
-        Ok(())
+        self.run(async |db| {
+            let mut transaction = db.transaction().await?;
+            if Setting::filter_by_key("active_profile")
+                .first()
+                .exec(&mut transaction)
+                .await?
+                .is_some()
+            {
+                Setting::filter_by_key("active_profile")
+                    .update()
+                    .value(id.to_string())
+                    .exec(&mut transaction)
+                    .await?;
+            } else {
+                Setting::create()
+                    .key("active_profile")
+                    .value(id.to_string())
+                    .exec(&mut transaction)
+                    .await?;
+            }
+            transaction.commit().await
+        })
     }
 
     pub fn selected(&self) -> Option<i64> {
-        self.0
-            .query_row(
-                "SELECT value FROM settings WHERE key='active_profile'",
-                [],
-                |row| row.get::<_, String>(0),
-            )
-            .ok()?
-            .parse()
-            .ok()
+        self.run(async |db| {
+            Setting::filter_by_key("active_profile")
+                .first()
+                .exec(db)
+                .await
+        })
+        .ok()??
+        .value
+        .parse()
+        .ok()
     }
 
     pub fn record(&self, profile: &Profile, focus: &CompletedFocus) -> Result<()> {
         let seconds = i64::try_from(focus.seconds).map_err(|e| e.to_string())?;
-        self.0.execute("INSERT INTO sessions(profile_id,started_at,finished_at,seconds,note,rate,currency) VALUES (?1,?2,?3,?4,?5,?6,?7)", params![profile.id, focus.started_at, focus.finished_at, seconds, focus.note, if profile.payable { profile.rate } else { 0 }, profile.currency]).map_err(|e| e.to_string())?;
-        Ok(())
+        if seconds == 0 {
+            return Err("A completed session must have a positive duration.".into());
+        }
+        self.run(async |db| {
+            StoredProfile::filter_by_id(profile.id)
+                .one()
+                .exec(db)
+                .await?;
+            StoredSession::create()
+                .profile_id(profile.id)
+                .started_at(focus.started_at)
+                .finished_at(focus.finished_at)
+                .seconds(seconds)
+                .note(focus.note.as_str())
+                .rate(if profile.payable { profile.rate } else { 0 })
+                .currency(profile.currency.as_str())
+                .exec(db)
+                .await?;
+            Ok(())
+        })
     }
 
     pub fn sessions(&self) -> Result<Vec<Session>> {
-        let mut query = self.0.prepare("SELECT s.id,s.profile_id,p.name,p.color,s.started_at,s.finished_at,s.seconds,s.note,s.rate,s.currency FROM sessions s JOIN profiles p ON p.id=s.profile_id ORDER BY s.finished_at DESC,s.id DESC").map_err(|e| e.to_string())?;
-        let rows = query
-            .query_map([], |row| {
+        // Fetch both tables in one read transaction. Include archived profiles;
+        // metadata is current while billing fields remain session snapshots.
+        let (profiles, mut sessions) = self.run(async |db| {
+            let mut transaction = db.transaction().await?;
+            let profiles = StoredProfile::all().exec(&mut transaction).await?;
+            let sessions = StoredSession::all().exec(&mut transaction).await?;
+            transaction.commit().await?;
+            Ok((profiles, sessions))
+        })?;
+        let profiles: HashMap<_, _> = profiles.into_iter().map(|p| (p.id, p)).collect();
+        sessions.sort_by_key(|s| std::cmp::Reverse((s.finished_at, s.id)));
+        sessions
+            .into_iter()
+            .map(|row| {
+                let profile = profiles.get(&row.profile_id).ok_or_else(|| {
+                    format!("Missing profile {} for session {}", row.profile_id, row.id)
+                })?;
                 Ok(Session {
-                    id: row.get(0)?,
-                    profile_id: row.get(1)?,
-                    profile_name: row.get(2)?,
-                    color: row.get(3)?,
-                    started_at: row.get(4)?,
-                    finished_at: row.get(5)?,
-                    seconds: row.get::<_, i64>(6)? as u64,
-                    note: row.get(7)?,
-                    rate: row.get(8)?,
-                    currency: row.get(9)?,
+                    id: row.id,
+                    profile_id: row.profile_id,
+                    profile_name: profile.name.clone(),
+                    color: profile.color.clone(),
+                    started_at: row.started_at,
+                    finished_at: row.finished_at,
+                    seconds: u64::try_from(row.seconds).map_err(|e| e.to_string())?,
+                    note: row.note,
+                    rate: row.rate,
+                    currency: row.currency,
                 })
             })
-            .map_err(|e| e.to_string())?;
-        rows.collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())
+            .collect()
     }
 }
 
@@ -324,8 +390,46 @@ mod tests {
     use super::*;
 
     #[test]
+    fn memory_databases_are_isolated_and_selection_can_be_replaced() {
+        let db = Database::open_path(Path::new(":memory:")).unwrap();
+        let other = Database::open_path(Path::new(":memory:")).unwrap();
+        assert_eq!(db.selected(), None);
+        let profile = db.create_profile("Second").unwrap();
+        db.select(1).unwrap();
+        db.select(profile.id).unwrap();
+        assert_eq!(db.selected(), Some(profile.id));
+        assert_eq!(other.selected(), None);
+        assert_eq!(other.profiles().unwrap().len(), 1);
+        assert!(db.create_profile("  ").is_err());
+    }
+
+    #[test]
+    fn database_constraints_reject_invalid_writes() {
+        let db = Database::open_path(Path::new(":memory:")).unwrap();
+        let mut profile = db.profiles().unwrap().remove(0);
+        profile.rate = -1;
+        assert!(db.save_profile(&profile).is_err());
+        assert_eq!(db.profiles().unwrap()[0].rate, 0);
+        for seconds in [0, u64::MAX] {
+            assert!(
+                db.record(
+                    &profile,
+                    &CompletedFocus {
+                        started_at: 100,
+                        finished_at: 100,
+                        seconds,
+                        note: String::new(),
+                    }
+                )
+                .is_err()
+            );
+        }
+        assert!(db.sessions().unwrap().is_empty());
+    }
+
+    #[test]
     fn profiles_sessions_and_archiving_round_trip() {
-        let db = Database::initialize(Connection::open_in_memory().unwrap()).unwrap();
+        let db = Database::open_path(Path::new(":memory:")).unwrap();
         let mut profile = db.profiles().unwrap().remove(0);
         profile.name = "Client work".into();
         profile.payable = true;
@@ -362,74 +466,8 @@ mod tests {
     }
 
     #[test]
-    fn legacy_sessions_migrate_without_losing_history() {
-        let db = Database::initialize(Connection::open_in_memory().unwrap()).unwrap();
-        let mut profile = db.profiles().unwrap().remove(0);
-        profile.name = "Current name".into();
-        profile.color = "#a855f7".into();
-        db.save_profile(&profile).unwrap();
-        // Recreate the version-one session layout with stale profile snapshots.
-        db.0.execute_batch(
-            "DROP TABLE sessions;
-             CREATE TABLE sessions (
-                id INTEGER PRIMARY KEY, profile_id INTEGER NOT NULL REFERENCES profiles(id),
-                profile_name TEXT NOT NULL, color TEXT NOT NULL,
-                started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL,
-                seconds INTEGER NOT NULL CHECK(seconds > 0), note TEXT NOT NULL,
-                rate INTEGER NOT NULL, currency TEXT NOT NULL
-             );
-             CREATE INDEX sessions_finished ON sessions(finished_at);
-             INSERT INTO sessions VALUES
-                (42,1,'Old name','#0083c9',100,1600,1500,'Original note',12550,'USD'),
-                (43,1,'Another old name','#008c69',2000,5600,3600,'Second note',0,'EUR');
-             UPDATE profiles SET archived=1 WHERE id=1;
-             PRAGMA user_version = 1;",
-        )
-        .unwrap();
-        let db = Database::initialize(db.0).unwrap();
-        let sessions = db.sessions().unwrap();
-        assert_eq!(sessions.len(), 2);
-        assert_eq!(sessions[0].id, 43);
-        assert_eq!(sessions[1].id, 42);
-        for session in &sessions {
-            assert_eq!(session.profile_id, profile.id);
-            assert_eq!(session.profile_name, profile.name);
-            assert_eq!(session.color, profile.color);
-        }
-        assert_eq!(sessions[1].started_at, 100);
-        assert_eq!(sessions[1].finished_at, 1600);
-        assert_eq!(sessions[1].seconds, 1500);
-        assert_eq!(sessions[1].note, "Original note");
-        assert_eq!(sessions[1].rate, 12550);
-        assert_eq!(sessions[1].currency, "USD");
-        assert_eq!(sessions[1].earnings(), 5229);
-        assert_eq!(sessions[0].note, "Second note");
-        assert_eq!(sessions[0].rate, 0);
-        assert_eq!(sessions[0].currency, "EUR");
-        let columns: String =
-            db.0.query_row(
-                "SELECT group_concat(name, ',') FROM pragma_table_info('sessions')",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(
-            columns,
-            "id,profile_id,started_at,finished_at,seconds,note,rate,currency"
-        );
-        assert_eq!(
-            db.0.query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
-                .unwrap(),
-            2
-        );
-        // Opening an already-migrated database is idempotent, even for archived history.
-        let reopened = Database::initialize(db.0).unwrap();
-        assert_eq!(reopened.sessions().unwrap(), sessions);
-    }
-
-    #[test]
     fn profile_edits_update_loaded_history_only_for_that_profile() {
-        let db = Rc::new(Database::initialize(Connection::open_in_memory().unwrap()).unwrap());
+        let db = Rc::new(Database::open_path(Path::new(":memory:")).unwrap());
         let first = db.profiles().unwrap().remove(0);
         let second = db.create_profile("Other").unwrap();
         let focus = CompletedFocus {
@@ -471,8 +509,8 @@ mod tests {
     }
 
     #[test]
-    fn sessions_require_an_existing_profile_and_prevent_its_deletion() {
-        let db = Database::initialize(Connection::open_in_memory().unwrap()).unwrap();
+    fn sessions_require_an_existing_profile() {
+        let db = Database::open_path(Path::new(":memory:")).unwrap();
         let mut profile = db.profiles().unwrap().remove(0);
         let focus = CompletedFocus {
             started_at: 100,
@@ -481,24 +519,9 @@ mod tests {
             note: String::new(),
         };
         db.record(&profile, &focus).unwrap();
-        assert!(
-            db.0.execute("DELETE FROM profiles WHERE id=?1", [profile.id])
-                .is_err()
-        );
         profile.id += 100;
         assert!(db.record(&profile, &focus).is_err());
         assert_eq!(db.sessions().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn newer_database_versions_are_not_downgraded() {
-        let connection = Connection::open_in_memory().unwrap();
-        connection
-            .execute_batch("PRAGMA user_version = 3;")
-            .unwrap();
-        assert!(
-            matches!(Database::initialize(connection), Err(error) if error.contains("Unsupported database version 3"))
-        );
     }
 
     #[test]
@@ -509,11 +532,28 @@ mod tests {
             chrono::Utc::now().timestamp_nanos_opt().unwrap()
         ));
         {
-            let db = Database::initialize(Connection::open(&path).unwrap()).unwrap();
-            db.create_profile("Persistent").unwrap();
+            let db = Database::open_path(&path).unwrap();
+            let profile = db.create_profile("Persistent").unwrap();
+            db.select(profile.id).unwrap();
+            db.record(
+                &profile,
+                &CompletedFocus {
+                    started_at: 100,
+                    finished_at: 1600,
+                    seconds: 1500,
+                    note: "Persistent history".into(),
+                },
+            )
+            .unwrap();
         }
-        let db = Database::initialize(Connection::open(&path).unwrap()).unwrap();
-        assert_eq!(db.profiles().unwrap()[1].name, "Persistent");
+        let db = Database::open_path(&path).unwrap();
+        let profile = &db.profiles().unwrap()[1];
+        assert_eq!(profile.name, "Persistent");
+        assert_eq!(db.selected(), Some(profile.id));
+        let sessions = db.sessions().unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].profile_id, profile.id);
+        assert_eq!(sessions[0].note, "Persistent history");
         drop(db);
         std::fs::remove_file(path).unwrap();
     }

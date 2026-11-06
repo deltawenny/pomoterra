@@ -79,8 +79,8 @@ Sessions reference profiles by ID. Renaming a profile or changing its color upda
 all its history immediately, including charts and filters. Deleted profiles are
 archived so their history remains available. Billing rates and currencies remain
 snapshots of each completed session, so pricing changes do not alter past earnings.
-Existing databases migrate automatically and transactionally to this relational
-schema on startup, preserving recorded sessions and billing data.
+Toasty creates the database schema on first startup. Legacy development schemas
+are not migrated; use a fresh database when changing an incompatible model.
 
 The yearly contribution calendar shows daily session counts, using profile colors
 and stronger shades for busier days. Scroll horizontally to explore the year.
@@ -88,6 +88,15 @@ Today, Week (Monday onward), Month, Year, and All filters use local calendar dat
 the calendar always shows the last 365 days. Filter by profile, including deleted
 profiles with history, and reverse the session date order. The profile bar chart
 shows focus duration for the selected period, alongside session and earnings totals.
+
+Database reads and writes use Toasty 0.11 with its SQLite driver. Typed table
+mappings live in [`src/persistence/models.rs`](src/persistence/models.rs), and
+[`src/persistence.rs`](src/persistence.rs) keeps the UI-facing storage API
+synchronous using a dedicated Tokio runtime. Toasty owns schema creation and all
+database access; there is no direct SQLite connection or legacy migration layer.
+Existing incompatible development databases must be removed manually or replaced
+by choosing a new database location.
+Building requires Rust 1.95 or newer (Toasty's minimum supported version).
 
 SQLite is bundled with the app. The database is stored in the operating system's
 local application data directory under `pomoterra/pomoterra.sqlite3`:
