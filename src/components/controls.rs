@@ -3,7 +3,7 @@ use std::time::Instant;
 use nsh_core::element::desktop;
 use nsh_core::prelude::*;
 
-use super::GREY;
+use super::{GREY, phase_color};
 use crate::icons::{Icon, icon};
 use crate::store::TimerState;
 
@@ -22,16 +22,20 @@ pub(crate) fn timer_controls(timer: Signal<TimerState>, announcements: Signal<bo
                 .items_center()
                 .justify_center()
                 .gap(px(4.0))
-                .child(control("Reset timer", Icon::RotateCcw, move || {
+                .child(control(timer, "Reset timer", Icon::RotateCcw, move || {
                     timer.update(TimerState::reset)
                 }))
                 .child(play_pause_button(timer))
-                .child(control("Skip session", Icon::SkipForward, move || {
-                    timer.update(TimerState::skip)
-                }))
-                .child(announcement_toggle(announcements)),
+                .child(control(
+                    timer,
+                    "Skip session",
+                    Icon::SkipForward,
+                    move || timer.update(TimerState::skip),
+                ))
+                .child(announcement_toggle(timer, announcements)),
         )
         .child(control(
+            timer,
             "Toggle full screen",
             Icon::Maximize,
             desktop::toggle_full_screen,
@@ -40,20 +44,30 @@ pub(crate) fn timer_controls(timer: Signal<TimerState>, announcements: Signal<bo
 
 fn session_counter(timer: Signal<TimerState>) -> View {
     view()
-        .w_14()
+        .w(px(64.0))
+        .flex_shrink_0()
         .items_center()
         .gap(px(3.0))
-        .child(text(move || format!("{} / 4\nSessions", timer.get().session)).text_size(px(14.0)))
+        .child(text(move || format!("{} / 4", timer.get().session)).text_size(px(14.0)))
+        .child(text("Sessions").text_size(px(14.0)))
 }
 
 fn play_pause_button(timer: Signal<TimerState>) -> View {
+    let hovered = signal(false);
+    let color = move || {
+        if hovered.get() {
+            phase_color(timer.get().phase)
+        } else {
+            GREY
+        }
+    };
     view()
         .w(px(56.0))
         .h(px(56.0))
         .flex_shrink_0()
         .rounded(px(28.0))
         .border_2()
-        .border_color(rgb(GREY))
+        .border_color(move || rgb(color()))
         .items_center()
         .justify_center()
         .role(AccessibilityRole::Button)
@@ -64,7 +78,8 @@ fn play_pause_button(timer: Signal<TimerState>) -> View {
                 "Start timer"
             }
         })
-        .hover(|s| s.bg(rgb(0xf2f7fa)))
+        .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))
+        .on_mouse_leave(move |_: &MouseEvent| hovered.set(false))
         .active(|s| s.opacity(0.5))
         .on_press(move || timer.update(|state| state.toggle(Instant::now())))
         .child(dynamic(move || {
@@ -74,13 +89,14 @@ fn play_pause_button(timer: Signal<TimerState>) -> View {
                 } else {
                     Icon::Play
                 },
-                GREY,
+                color(),
                 28.0,
             )
         }))
 }
 
-fn announcement_toggle(announcements: Signal<bool>) -> View {
+fn announcement_toggle(timer: Signal<TimerState>, announcements: Signal<bool>) -> View {
+    let hovered = signal(false);
     view()
         .w(px(38.0))
         .h(px(44.0))
@@ -94,6 +110,9 @@ fn announcement_toggle(announcements: Signal<bool>) -> View {
                 "Enable announcements"
             }
         })
+        .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))
+        .on_mouse_leave(move |_: &MouseEvent| hovered.set(false))
+        .active(|s| s.opacity(0.5))
         .on_press(move || announcements.update(|value| *value = !*value))
         .child(dynamic(move || {
             icon(
@@ -102,13 +121,23 @@ fn announcement_toggle(announcements: Signal<bool>) -> View {
                 } else {
                     Icon::VolumeX
                 },
-                GREY,
+                if hovered.get() {
+                    phase_color(timer.get().phase)
+                } else {
+                    GREY
+                },
                 23.0,
             )
         }))
 }
 
-fn control(label: &'static str, name: Icon, action: impl Fn() + 'static) -> View {
+fn control(
+    timer: Signal<TimerState>,
+    label: &'static str,
+    name: Icon,
+    action: impl Fn() + 'static,
+) -> View {
+    let hovered = signal(false);
     view()
         .w(px(38.0))
         .h(px(44.0))
@@ -117,8 +146,19 @@ fn control(label: &'static str, name: Icon, action: impl Fn() + 'static) -> View
         .rounded(px(6.0))
         .role(AccessibilityRole::Button)
         .label(label)
-        .hover(|s| s.bg(rgb(0xf2f7fa)))
+        .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))
+        .on_mouse_leave(move |_: &MouseEvent| hovered.set(false))
         .active(|s| s.opacity(0.5))
         .on_press(action)
-        .child(icon(name, GREY, 23.0))
+        .child(dynamic(move || {
+            icon(
+                name,
+                if hovered.get() {
+                    phase_color(timer.get().phase)
+                } else {
+                    GREY
+                },
+                23.0,
+            )
+        }))
 }

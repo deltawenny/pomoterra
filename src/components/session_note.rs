@@ -1,10 +1,12 @@
 use nsh_core::element::input;
 use nsh_core::prelude::*;
 
-use super::GREY;
+use super::{GREY, phase_color};
 use crate::icons::{Icon, icon};
+use crate::store::TimerState;
 
-pub(crate) fn session_note() -> View {
+pub(crate) fn session_note(timer: Signal<TimerState>) -> View {
+    let hovered = signal(false);
     let note = signal(String::new());
     let editing = signal(false);
 
@@ -52,7 +54,19 @@ pub(crate) fn session_note() -> View {
                         "Edit note"
                     }
                 })
+                .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))
+                .on_mouse_leave(move |_: &MouseEvent| hovered.set(false))
                 .on_press(move || editing.update(|value| *value = !*value))
-                .child(icon(Icon::EllipsisVertical, GREY, 16.0)),
+                .child(dynamic(move || {
+                    icon(
+                        Icon::EllipsisVertical,
+                        if hovered.get() {
+                            phase_color(timer.get().phase)
+                        } else {
+                            GREY
+                        },
+                        16.0,
+                    )
+                })),
         )
 }

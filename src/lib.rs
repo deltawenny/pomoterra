@@ -56,7 +56,7 @@ pub fn App() -> impl IntoElement {
         .bg(rgb(0xffffff))
         .text_color(rgb(GREY))
         .p_safe_area()
-        .child(tab_header())
+        .child(tab_header(timer))
         .child(timer_display(timer))
         .child(
             view()
@@ -64,7 +64,7 @@ pub fn App() -> impl IntoElement {
                 .pb(px(17.0))
                 .flex_shrink_0()
                 .gap(px(18.0))
-                .child(session_note())
+                .child(session_note(timer))
                 .child(timer_controls(timer, announcements)),
         )
 }

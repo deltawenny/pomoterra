@@ -10,4 +10,12 @@ pub(crate) use session_note::session_note;
 pub(crate) use timer_display::timer_display;
 
 const BLUE: u32 = 0x0083c9;
+const GREEN: u32 = 0x008c69;
+
+fn phase_color(phase: crate::store::Phase) -> u32 {
+    match phase {
+        crate::store::Phase::Focus => BLUE,
+        crate::store::Phase::Break => GREEN,
+    }
+}
 pub(crate) const GREY: u32 = 0x686868;
