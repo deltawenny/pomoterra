@@ -8,6 +8,8 @@ use nsh_base::SelectItem;
 use nsh_core::{element::scroll, prelude::*};
 use std::collections::BTreeMap;
 
+mod sample;
+
 #[derive(Clone, Copy, PartialEq)]
 enum Period {
     Today,
@@ -42,10 +44,25 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
     let period = signal(Period::Week);
     let profile = signal(0_i64);
     let oldest = signal(false);
+    let preview = signal(None::<Vec<Session>>);
+    let displayed_sessions = move || preview.get().unwrap_or_else(|| library.get().sessions);
     scroll().flex_1().child(view().p(px(16.0)).gap(px(16.0))
         .child(view().flex_row().justify_between().items_center()
             .child(text("Focus history").text_size(px(17.0)).text_color(rgb(0x222222)))
             .child(super::profiles::text_button("Reverse date order", move || oldest.update(|v| *v = !*v))))
+        .child(view().gap(px(6.0))
+            .child(dynamic(move || {
+                super::profiles::text_button(
+                    if preview.get().is_some() { "Show real history" } else { "Show sample history" },
+                    move || {
+                        preview.set(if preview.get().is_some() { None } else { Some(sample::sessions(Local::now())) });
+                        profile.set(0);
+                    },
+                )
+            }))
+            .child(when(move || preview.get().is_some(), || {
+                text("Sample preview only · saved history is unchanged.").text_size(px(11.0)).text_color(rgb(BLUE))
+            })))
         .child(view().flex_row().gap(px(6.0)).children([
             (Period::Today, "Today"), (Period::Week, "Week"), (Period::Month, "Month"), (Period::Year, "Year"), (Period::All, "All")
         ].into_iter().map(move |(value, title)| {
@@ -58,8 +75,10 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
         .child(combobox()
             .items(move || {
                 let data = library.get();
-                let mut names: BTreeMap<i64, String> = data.sessions.iter().map(|s| (s.profile_id, s.profile_name.clone())).collect();
-                names.extend(data.profiles.iter().map(|p| (p.id, p.name.clone())));
+                let mut names: BTreeMap<i64, String> = displayed_sessions().iter().map(|s| (s.profile_id, s.profile_name.clone())).collect();
+                if preview.get().is_none() {
+                    names.extend(data.profiles.iter().map(|p| (p.id, p.name.clone())));
+                }
                 std::iter::once(SelectItem::new("0", "All profiles"))
                     .chain(sorted_items(names.into_iter().map(|(id, name)| SelectItem::new(id.to_string(), name)))).collect::<Vec<_>>()
             })
@@ -67,11 +86,11 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
             .accessibility_label("History profile")
             .placeholder("Search profiles")
             .on_change(move |value: &Vec<SharedString>| { if let Some(id) = value.first().and_then(|v| v.parse().ok()) { profile.set(id); } }))
-        .child(dynamic(move || calendar(&library.get().sessions, profile.get())))
+        .child(dynamic(move || calendar(&displayed_sessions(), profile.get())))
         .child(dynamic(move || {
             let today = Local::now().date_naive();
             let start = period.get().start(today);
-            let mut sessions: Vec<_> = library.get().sessions.into_iter()
+            let mut sessions: Vec<_> = displayed_sessions().into_iter()
                 .filter(|s| (profile.get() == 0 || s.profile_id == profile.get()) && date(s) <= today && start.is_none_or(|start| date(s) >= start)).collect();
             if oldest.get() { sessions.reverse(); }
             let seconds: u64 = sessions.iter().map(|s| s.seconds).sum();

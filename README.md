@@ -89,6 +89,14 @@ the calendar always shows the last 365 days. Filter by profile, including delete
 profiles with history, and reverse the session date order. The profile bar chart
 shows focus duration for the selected period, alongside session and earnings totals.
 
+To inspect the History UI without waiting for real sessions, click **Show sample
+history** in the History tab. This previews over a thousand sample sessions across
+400 days, with multiple profile colors, paid and unpaid work, USD/EUR earnings,
+and varied notes. All period filters, profile filters, charts, and date ordering
+work on the preview. **Show real history** switches back and resets the profile
+filter. Sample data stays in memory only: it never changes saved profiles or
+sessions, and restarting the app returns to real history.
+
 Database reads and writes use Toasty 0.11 with its SQLite driver. Typed table
 mappings live in [`src/persistence/models.rs`](src/persistence/models.rs), and
 [`src/persistence.rs`](src/persistence.rs) keeps the UI-facing storage API
