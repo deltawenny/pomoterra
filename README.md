@@ -75,8 +75,12 @@ start and finish times, focused duration, note, color, and billing rate. Pauses 
 scheduled breaks do not add billable time. Reset and Skip discard the current
 unfinished period. Changing timer rules or switching profiles resets the current
 cycle. A scheduled break preserves the interrupted focus period until it finishes.
-Recorded profile names, colors, and rates are snapshots, so later edits do not
-rewrite old sessions.
+Sessions reference profiles by ID. Renaming a profile or changing its color updates
+all its history immediately, including charts and filters. Deleted profiles are
+archived so their history remains available. Billing rates and currencies remain
+snapshots of each completed session, so pricing changes do not alter past earnings.
+Existing databases migrate automatically and transactionally to this relational
+schema on startup, preserving recorded sessions and billing data.
 
 The yearly contribution calendar shows daily session counts, using profile colors
 and stronger shades for busier days. Scroll horizontally to explore the year.
