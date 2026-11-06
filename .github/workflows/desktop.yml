@@ -1,0 +1,20 @@
+name: Desktop checks
+on: [push, pull_request]
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Install Linux backend dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libpango1.0-dev libegl1-mesa-dev
+      - run: cargo fmt --check
+      - run: cargo check --all-targets --locked
+      - run: cargo test --lib --locked

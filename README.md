@@ -13,6 +13,40 @@ Click the three dots to edit or save a session note. The speaker control toggles
 screen-reader completion announcements (not an audio alarm). Notes and timer
 state are kept in memory for the current app run.
 
+## Background operation and tray
+
+On Linux, Windows, and macOS, closing the window hides it to the system tray
+(macOS menu bar) instead of
+stopping the app. An active timer and scheduled breaks continue working while
+hidden; restoring the window preserves the current timer, settings, and note.
+The next session still waits for Start, just as it does with the window visible.
+
+The tray uses a blue Lucide timer icon with **Restore the app** and **Quit**
+actions. On Linux, clicking the icon also restores the window. On Windows and
+macOS, clicking opens its menu. **Quit** exits completely; Linux also supports
+Ctrl+Q and macOS retains its normal Cmd+Q application shortcut. On Linux,
+Ctrl+W hides the window; Windows Alt+F4 and macOS's close button do the same.
+This integration is installed by the Rust root in both the direct desktop
+launcher and NSH-generated desktop runners. Restoring keeps the same engine
+and timer state rather than mounting a new app.
+
+On Linux, a StatusNotifier-compatible desktop tray and a session D-Bus connection are
+required (for example, KDE Plasma or GNOME with an AppIndicator extension).
+If tray registration fails, closing the window exits normally. If the tray host
+disappears while the app is running, the window is restored so it stays reachable.
+No AppIndicator/GTK 3 system library is required. Windows uses a native
+notification-area icon; macOS uses a native status item. Platform-specific
+objects stay on their operating system's UI thread. If native tray creation
+fails, normal close-to-exit behavior is retained.
+
+Mobile and web retain their existing UI and lifecycle without desktop tray
+dependencies. A desktop tray does not provide mobile background execution or
+keep a closed browser tab running.
+
+Desktop CI checks compilation and unit tests on Linux, Windows, and macOS.
+Native interaction on Windows/macOS still needs validation on those systems;
+Linux cross-compilation alone cannot verify their desktop behavior.
+
 ## Config
 
 The Config tab adjusts focus time (1–120 minutes), short and long breaks

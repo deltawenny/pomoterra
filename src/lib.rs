@@ -3,6 +3,9 @@ mod components;
 mod icons;
 mod store;
 
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+mod desktop;
+
 use chrono::{Datelike, Local, Timelike};
 use components::{GREY, Tab, config_tab, session_note, tab_header, timer_controls, timer_display};
 use nsh_core::prelude::*;
@@ -28,6 +31,7 @@ fn constrain_window_size() {
         for window in gtk::Window::list_toplevels() {
             if let Ok(window) = window.downcast::<gtk::ApplicationWindow>() {
                 window.set_size_request(MAX_WIDTH, MAX_HEIGHT);
+                desktop::install(&window);
             }
         }
     });
@@ -38,6 +42,8 @@ fn constrain_window_size() {
 pub fn App() -> impl IntoElement {
     #[cfg(target_os = "linux")]
     constrain_window_size();
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    desktop::install();
 
     let timer = signal(TimerState::default());
     let announcements = signal(true);
