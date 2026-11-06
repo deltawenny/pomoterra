@@ -5,7 +5,7 @@ pub const FOCUS_SECONDS: u64 = 25 * 60;
 const BREAK_SECONDS: u64 = 5 * 60;
 const LONG_BREAK_SECONDS: u64 = 15 * 60;
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpecialBreak {
     pub time: String,
     pub minutes: String,
@@ -21,7 +21,7 @@ impl SpecialBreak {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TimerRules {
     pub focus_minutes: u32,
     pub short_break_minutes: u32,
@@ -55,6 +55,9 @@ pub struct TimerState {
     pub remaining: u64,
     pub running: bool,
     pub rules: TimerRules,
+    pub note: String,
+    pub completed: Vec<CompletedFocus>,
+    started_at: Option<i64>,
     special_duration: Option<u64>,
     interrupted_focus: Option<u64>,
     last_special: [Option<(i32, u32)>; 4],
@@ -69,12 +72,23 @@ impl Default for TimerState {
             remaining: FOCUS_SECONDS,
             running: false,
             rules: TimerRules::default(),
+            note: String::new(),
+            completed: Vec::new(),
+            started_at: None,
             special_duration: None,
             interrupted_focus: None,
             last_special: [None; 4],
             deadline: None,
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompletedFocus {
+    pub started_at: i64,
+    pub finished_at: i64,
+    pub seconds: u64,
+    pub note: String,
 }
 
 impl TimerState {
@@ -134,6 +148,9 @@ impl TimerState {
             self.running = false;
             self.deadline = None;
         } else {
+            if self.phase == Phase::Focus && self.started_at.is_none() {
+                self.started_at = Some(chrono::Utc::now().timestamp());
+            }
             self.running = true;
             self.deadline = Some(now + Duration::from_secs(self.remaining));
         }
@@ -146,6 +163,17 @@ impl TimerState {
             return false;
         };
         if now >= deadline {
+            if self.phase == Phase::Focus {
+                let finished_at = chrono::Utc::now().timestamp();
+                self.completed.push(CompletedFocus {
+                    started_at: self
+                        .started_at
+                        .unwrap_or(finished_at - self.duration() as i64),
+                    finished_at,
+                    seconds: u64::from(self.rules.focus_minutes) * 60,
+                    note: self.note.clone(),
+                });
+            }
             self.skip();
             return true;
         }
@@ -154,6 +182,7 @@ impl TimerState {
     }
 
     pub fn reset(&mut self) {
+        self.started_at = None;
         self.running = false;
         self.deadline = None;
         self.remaining = self.duration();
@@ -163,7 +192,9 @@ impl TimerState {
         if let Some(remaining) = self.interrupted_focus.take() {
             self.special_duration = None;
             self.phase = Phase::Focus;
+            let started_at = self.started_at;
             self.reset();
+            self.started_at = started_at;
             self.remaining = remaining;
             return;
         }
@@ -295,6 +326,44 @@ mod tests {
         assert_eq!(timer.phase, Phase::Focus);
         timer.check_special_break(2, 570, now + Duration::from_secs(663));
         assert_eq!(timer.phase, Phase::Break);
+    }
+
+    #[test]
+    fn only_completed_focus_is_recorded_once_with_note() {
+        let now = Instant::now();
+        let mut timer = TimerState::default();
+        timer.note = "Build profiles".into();
+        timer.toggle(now);
+        timer.tick(now + Duration::from_secs(FOCUS_SECONDS));
+        assert_eq!(timer.completed.len(), 1);
+        assert_eq!(timer.completed[0].note, "Build profiles");
+        assert_eq!(timer.completed[0].seconds, FOCUS_SECONDS);
+        timer.tick(now + Duration::from_secs(FOCUS_SECONDS + 1));
+        timer.toggle(now + Duration::from_secs(FOCUS_SECONDS + 1));
+        timer.tick(now + Duration::from_secs(FOCUS_SECONDS + BREAK_SECONDS + 1));
+        assert_eq!(timer.completed.len(), 1);
+        timer.toggle(now);
+        timer.reset();
+        timer.skip();
+        assert_eq!(timer.completed.len(), 1);
+    }
+
+    #[test]
+    fn scheduled_break_does_not_record_partial_focus() {
+        let now = Instant::now();
+        let mut timer = TimerState::default();
+        timer.rules.special_breaks[0] = SpecialBreak {
+            time: "09:30".into(),
+            minutes: "10".into(),
+        };
+        timer.toggle(now);
+        timer.check_special_break(1, 570, now + Duration::from_secs(60));
+        timer.tick(now + Duration::from_secs(660));
+        assert!(timer.completed.is_empty());
+        timer.toggle(now + Duration::from_secs(661));
+        timer.tick(now + Duration::from_secs(661 + FOCUS_SECONDS - 60));
+        assert_eq!(timer.completed.len(), 1);
+        assert_eq!(timer.completed[0].seconds, FOCUS_SECONDS);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use nsh_core::element::input;
+use super::input::{input_content, input_group};
 use nsh_core::prelude::*;
 
 use super::{GREY, phase_color};
@@ -7,37 +7,30 @@ use crate::store::TimerState;
 
 pub(crate) fn session_note(timer: Signal<TimerState>) -> View {
     let hovered = signal(false);
-    let note = signal(String::new());
     let editing = signal(false);
 
-    view()
-        .h(px(56.0))
-        .bg(rgb(0xfafafa))
-        .border_1()
-        .border_color(rgb(0xefefef))
-        .rounded(px(3.0))
-        .flex_row()
-        .items_center()
+    input_group(|| false)
         .child(
             when(
                 move || editing.get(),
                 move || {
-                    input()
+                    input_content()
                         .flex_1()
                         .h_full()
-                        .px(px(10.0))
-                        .text_size(px(14.0))
                         .label("Session note")
                         .placeholder("What are you focusing on?")
-                        .value(move || note.get())
-                        .on_change(move |value: &str| note.set(value.to_owned()))
+                        .value(move || timer.get().note.clone())
+                        .on_change(move |value: &str| {
+                            timer.update(|state| state.note = value.to_owned())
+                        })
                 },
             )
             .otherwise(move || {
-                text(move || note.get())
+                text(move || timer.get().note.clone())
                     .flex_1()
                     .px(px(10.0))
-                    .text_size(px(14.0))
+                    .text_size(px(12.0))
+                    .text_color(rgb(0x333333))
             }),
         )
         .child(
@@ -45,7 +38,7 @@ pub(crate) fn session_note(timer: Signal<TimerState>) -> View {
                 .w(px(30.0))
                 .h_full()
                 .items_center()
-                .pt(px(8.0))
+                .justify_center()
                 .role(AccessibilityRole::Button)
                 .label(move || {
                     if editing.get() {

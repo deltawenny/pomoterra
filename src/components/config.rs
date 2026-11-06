@@ -1,8 +1,8 @@
+use super::input::{input_content, input_group};
 use nsh_base::{SliderValue, slider};
-use nsh_core::element::input;
 use nsh_core::prelude::*;
 
-use super::{BLUE, GREY};
+use super::GREY;
 use crate::store::{TimerRules, TimerState};
 
 #[derive(Clone, Copy)]
@@ -24,11 +24,17 @@ impl Rule {
     }
 }
 
-pub(crate) fn config_tab(timer: Signal<TimerState>) -> View {
+pub(crate) fn config_tab(
+    timer: Signal<TimerState>,
+    library: Signal<crate::persistence::Library>,
+    active: Signal<i64>,
+) -> View {
     view()
         .flex_1()
         .px(px(20.0))
         .pt(px(23.0))
+        .pb(px(24.0))
+        .child(super::profiles::profile_settings(timer, library, active))
         .child(
             view()
                 .flex_row()
@@ -133,20 +139,12 @@ fn special_break(timer: Signal<TimerState>, index: usize) -> View {
         let entry = &timer.get().rules.special_breaks[index];
         (!entry.time.is_empty() || !entry.minutes.is_empty()) && entry.schedule().is_none()
     };
-    view()
+    input_group(invalid)
         .flex_1()
-        .h(px(32.0))
-        .flex_row()
-        .bg(rgb(0xfafafa))
-        .border_1()
-        .border_color(move || rgb(if invalid() { 0xd66854 } else { 0xefefef }))
         .child(
-            input()
+            input_content()
                 .flex_1()
                 .h_full()
-                .px(px(8.0))
-                .text_size(px(12.0))
-                .text_color(rgb(GREY))
                 .label(format!("Special break {} start time (HH:MM)", index + 1))
                 .placeholder("--:--")
                 .value(move || timer.get().rules.special_breaks[index].time.clone())
@@ -157,14 +155,11 @@ fn special_break(timer: Signal<TimerState>, index: usize) -> View {
                 }),
         )
         .child(
-            input()
-                .w(px(46.0))
+            input_content()
+                .w(px(54.0))
                 .h_full()
-                .px(px(6.0))
                 .border_l_1()
-                .border_color(rgb(0xe5e5e5))
-                .text_size(px(12.0))
-                .text_color(rgb(BLUE))
+                .border_color(rgb(0xcccccc))
                 .label(format!(
                     "Special break {} duration in minutes (1–180)",
                     index + 1

@@ -7,6 +7,7 @@ use crate::icons::{Icon, icon};
 pub(crate) enum Tab {
     Config,
     Timer,
+    History,
 }
 
 pub(crate) fn tab_header(selected: Signal<Tab>) -> View {
@@ -19,6 +20,7 @@ pub(crate) fn tab_header(selected: Signal<Tab>) -> View {
         .justify_center()
         .child(tab(selected, Tab::Config, "Config", Icon::Clock))
         .child(tab(selected, Tab::Timer, "Timer", Icon::Timer))
+        .child(tab(selected, Tab::History, "History", Icon::History))
 }
 
 fn tab(selected: Signal<Tab>, tab: Tab, label: &'static str, name: Icon) -> View {

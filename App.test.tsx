@@ -1,5 +1,39 @@
 import { expect, open, test } from "nsh/test";
 
+// Run with POMOTERRA_DB_PATH=:memory: to isolate each app instance.
+test("creates and edits a payable profile, then deletes it", async () => {
+  const app = await open(".");
+  await app.press("Config");
+  await app.press("Add profile");
+  await app.clear("Profile name");
+  await app.type("Profile name", "Client work");
+  await app.press("Save profile name");
+  expect(app.texts()).toContain("Client work");
+  await app.press("Payable");
+  await app.clear("Hourly rate");
+  await app.type("Hourly rate", "45.50");
+  expect(app.value("Hourly rate")).toBe("45.50");
+  await app.press("Use color #a855f7");
+  expect(app.value("Profile color hex")).toBe("#a855f7");
+  await app.press("Delete profile");
+  await app.press("Confirm delete");
+  expect(app.texts()).toContain("Default");
+});
+
+test("history filters show an empty state without completed sessions", async () => {
+  const app = await open(".");
+  await app.press("Skip session");
+  await app.press("History");
+  expect(app.texts()).toContain("Focus history");
+  expect(app.texts()).toContain("0 focus sessions in the last year");
+  expect(app.texts()).toContain("0 sessions · 0h 0m");
+  await app.press("History: Month");
+  await app.press("Reverse date order");
+  expect(app.texts()).toContain("SESSIONS · OLDEST FIRST");
+  await app.press("History: All");
+  expect(app.texts()).toContain("No completed focus sessions in this period. Finish a focus session to start your history.");
+});
+
 test("shows Config navigation and the initial focus session", async () => {
   const app = await open(".");
   expect(app.texts()).toContain("Timer");

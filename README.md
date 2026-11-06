@@ -1,6 +1,6 @@
 # pomoterra
 
-A compact Pomodoro timer written in Rust with Timer and Config tabs. Its UI is `src/lib.rs`, and `nsh.json` names the root component (`"root": "App"`).
+A compact Pomodoro timer written in Rust with Timer, Config, and History tabs. Its UI is `src/lib.rs`, and `nsh.json` names the root component (`"root": "App"`).
 
 ## Timer
 
@@ -11,7 +11,7 @@ The next session waits for you to press Start. Reset restarts the current phase.
 
 Click the three dots to edit or save a session note. The speaker control toggles
 screen-reader completion announcements (not an audio alarm). Notes and timer
-state are kept in memory for the current app run.
+countdown state are kept in memory for the current app run. Completed focus sessions save their notes to SQLite.
 
 ## Background operation and tray
 
@@ -58,7 +58,46 @@ Four optional special breaks each accept a local 24-hour start time (`HH:MM`)
 and a duration of 1–180 minutes. Incomplete or invalid entries have a red border
 and do not run. A matching time interrupts an active focus session once per day;
 after the break, the remaining focus time is ready to resume. Schedules only
-run while the app is open. Rules and schedules are kept in memory for this app run.
+run while the app is open. Rules and schedules are saved automatically per profile in SQLite.
+
+The profile picker supports searching, adding, renaming, and deleting profiles.
+Switching profiles starts a fresh focus cycle with that profile's rules. Deleting
+requires confirmation and keeps all recorded history; at least one profile must remain.
+Choose a profile color from the palette or enter a six-digit hex color. Enable
+Payable to set a rate per hour and currency. Rates accept up to two decimal places.
+Amounts use integer hundredths of the selected currency; different currencies are
+reported separately, without conversion.
+
+## History and storage
+
+History records each naturally completed focus period once, including its profile,
+start and finish times, focused duration, note, color, and billing rate. Pauses and
+scheduled breaks do not add billable time. Reset and Skip discard the current
+unfinished period. Changing timer rules or switching profiles resets the current
+cycle. A scheduled break preserves the interrupted focus period until it finishes.
+Recorded profile names, colors, and rates are snapshots, so later edits do not
+rewrite old sessions.
+
+The yearly contribution calendar shows daily session counts, using profile colors
+and stronger shades for busier days. Scroll horizontally to explore the year.
+Today, Week (Monday onward), Month, Year, and All filters use local calendar dates;
+the calendar always shows the last 365 days. Filter by profile, including deleted
+profiles with history, and reverse the session date order. The profile bar chart
+shows focus duration for the selected period, alongside session and earnings totals.
+
+SQLite is bundled with the app. The database is stored in the operating system's
+local application data directory under `pomoterra/pomoterra.sqlite3`:
+
+- Linux: `$XDG_DATA_HOME/pomoterra/pomoterra.sqlite3`, normally `~/.local/share/pomoterra/pomoterra.sqlite3`.
+- Windows: `%LOCALAPPDATA%\\pomoterra\\pomoterra.sqlite3`.
+- macOS: `~/Library/Application Support/pomoterra/pomoterra.sqlite3`.
+
+Set `POMOTERRA_DB_PATH` to use another location, or `:memory:` for an isolated test
+run. Storage failures appear in the app; failed session writes remain queued in
+memory and retry while the app is open. Quit only after resolving any storage
+error to retain those pending records. Profiles and history survive restarts;
+unfinished countdowns and draft notes do not. The SQLite backend requires a native
+filesystem; browser persistence is not supported by this backend.
 
 Timer-state tests live in `src/store.rs`; `App.test.tsx` tests the UI controls.
 

@@ -1,14 +1,18 @@
 //! A compact Pomodoro timer with configurable rules and scheduled breaks.
 mod components;
 mod icons;
+mod persistence;
 mod store;
 
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 mod desktop;
 
 use chrono::{Datelike, Local, Timelike};
-use components::{GREY, Tab, config_tab, session_note, tab_header, timer_controls, timer_display};
+use components::{
+    GREY, Tab, config_tab, history_tab, session_note, tab_header, timer_controls, timer_display,
+};
 use nsh_core::prelude::*;
+use persistence::Library;
 use std::time::{Duration, Instant};
 use store::TimerState;
 
@@ -16,6 +20,43 @@ use store::TimerState;
 fn native(registry: &mut Registry) {
     registry.assets(icons::ASSETS);
     registry.register::<App>();
+}
+
+/// Remove only successfully saved records; failed writes stay queued for retry.
+fn flush_completed(timer: Signal<TimerState>, library: Signal<Library>, profile_id: i64) {
+    let pending = timer.get().completed.clone();
+    if pending.is_empty() {
+        return;
+    }
+    let data = library.get();
+    let Some(profile) = data.profiles.iter().find(|p| p.id == profile_id) else {
+        return;
+    };
+    let Some(database) = data.database.as_ref() else {
+        return;
+    };
+    let mut saved = 0;
+    for focus in &pending {
+        match database.record(profile, focus) {
+            Ok(()) => saved += 1,
+            Err(error) => {
+                library.update(|data| data.error = error);
+                break;
+            }
+        }
+    }
+    if saved > 0 {
+        timer.update(|state| {
+            state.completed.drain(..saved);
+        });
+        match database.sessions() {
+            Ok(sessions) => library.update(|data| {
+                data.sessions = sessions;
+                data.error.clear();
+            }),
+            Err(error) => library.update(|data| data.error = error),
+        }
+    }
 }
 
 const MAX_WIDTH: i32 = 340;
@@ -45,7 +86,39 @@ pub fn App() -> impl IntoElement {
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     desktop::install();
 
-    let timer = signal(TimerState::default());
+    let loaded = Library::load();
+    let active_id = loaded
+        .database
+        .as_ref()
+        .and_then(|db| db.selected())
+        .filter(|id| loaded.profiles.iter().any(|p| p.id == *id))
+        .or_else(|| loaded.profiles.first().map(|p| p.id))
+        .unwrap_or(0);
+    let mut initial_timer = TimerState::default();
+    if let Some(profile) = loaded.profiles.iter().find(|p| p.id == active_id) {
+        initial_timer.configure(|rules| *rules = profile.rules.clone());
+    }
+    let library = signal(loaded);
+    let active = signal(active_id);
+    let timer = signal(initial_timer);
+    // Observe only rule changes, not each countdown tick, before writing SQLite.
+    let saved_rules = signal(timer.get().rules.clone());
+    effect(move || {
+        let rules = timer.get().rules.clone();
+        if saved_rules.get() != rules {
+            saved_rules.set(rules.clone());
+            library.update(|data| {
+                if data
+                    .profiles
+                    .iter()
+                    .find(|p| p.id == active.get())
+                    .is_some_and(|p| p.rules != rules)
+                {
+                    data.edit(active.get(), |profile| profile.rules = rules);
+                }
+            });
+        }
+    });
     let announcements = signal(true);
     let selected = signal(Tab::Timer);
 
@@ -66,6 +139,10 @@ pub fn App() -> impl IntoElement {
                 announce_for_accessibility("Session complete. Your next session is ready.");
             }
         }
+        // Also catches completion discovered by pause and retries failed writes.
+        if !timer.get().completed.is_empty() {
+            flush_completed(timer, library, active.get());
+        }
     });
 
     view()
@@ -74,16 +151,51 @@ pub fn App() -> impl IntoElement {
         .text_color(rgb(GREY))
         .p_safe_area()
         .child(tab_header(selected))
+        .child(when(
+            move || !library.get().error.is_empty(),
+            move || {
+                text(move || library.get().error.clone())
+                    .text_size(px(12.0))
+                    .text_color(rgb(0xb34230))
+                    .px(px(16.0))
+                    .py(px(8.0))
+            },
+        ))
+        .child(
+            view()
+                .flex_1()
+                .style_when(move || selected.get() != Tab::History, |s| s.hidden())
+                .child(history_tab(library)),
+        )
         .child(
             view()
                 .flex_1()
                 .style_when(move || selected.get() != Tab::Config, |s| s.hidden())
-                .child(config_tab(timer)),
+                .child(
+                    nsh_core::element::scroll()
+                        .flex_1()
+                        .child(config_tab(timer, library, active)),
+                ),
         )
         .child(
             view()
                 .flex_1()
                 .style_when(move || selected.get() != Tab::Timer, |s| s.hidden())
+                .child(
+                    text(move || {
+                        library
+                            .get()
+                            .profiles
+                            .iter()
+                            .find(|p| p.id == active.get())
+                            .map(|p| p.name.clone())
+                            .unwrap_or_default()
+                    })
+                    .text_size(px(12.0))
+                    .text_color(rgb(GREY))
+                    .px(px(20.0))
+                    .pt(px(8.0)),
+                )
                 .child(timer_display(timer))
                 .child(
                     view()
