@@ -1,0 +1,144 @@
+name: Desktop release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate release version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate package versions and tag
+        id: version
+        shell: bash
+        run: |
+          args=()
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            args+=(--tag "$GITHUB_REF_NAME")
+          fi
+          python .github/scripts/package.py metadata "${args[@]}" >> "$GITHUB_OUTPUT"
+      - name: Test packaging helpers
+        run: python -m unittest discover -s .github/scripts -p 'test_*.py' -v
+
+  package:
+    name: Package ${{ matrix.platform }} ${{ matrix.arch }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+          - os: windows-2022
+            platform: windows
+            arch: x64
+            target: x86_64-pc-windows-msvc
+          - os: macos-15-intel
+            platform: macos
+            arch: x64
+            target: x86_64-apple-darwin
+          - os: macos-15
+            platform: macos
+            arch: arm64
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_TARGET_DIR: target
+      CARGO_PROFILE_RELEASE_LTO: 'true'
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '1'
+      CARGO_PROFILE_RELEASE_STRIP: symbols
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+      - name: Install Linux build and packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libpango1.0-dev libegl1-mesa-dev dpkg-dev
+      - name: Run native unit tests
+        run: cargo test --lib --locked --target ${{ matrix.target }}
+      - name: Build native desktop launcher
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin nsh-app-pomoterra
+      - name: Create and verify distributables
+        run: python .github/scripts/package.py package --target ${{ matrix.target }} --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+      - name: Upload distributables
+        uses: actions/upload-artifact@v4
+        with:
+          name: pomoterra-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish complete GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [prepare, package]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.ref_name }}
+      PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pomoterra-*
+          merge-multiple: true
+          path: dist
+      - name: Verify all checksums
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          sha256sum --check -- *.sha256
+          cat -- *.sha256 | sort -k2 > SHA256SUMS
+      - name: Stage assets and publish release
+        shell: bash
+        run: |
+          set -euo pipefail
+          # New releases stay drafts until every asset has uploaded successfully.
+          if ! gh release view "$RELEASE_TAG" --json tagName > /dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "Pomoterra $RELEASE_TAG" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" dist/* --clobber
+          args=(--draft=false)
+          if [[ "$PRERELEASE" == true ]]; then
+            args+=(--prerelease --latest=false)
+          else
+            args+=(--prerelease=false)
+          fi
+          gh release edit "$RELEASE_TAG" "${args[@]}"
+          echo "Published Pomoterra $RELEASE_TAG for Linux, Windows, and macOS." >> "$GITHUB_STEP_SUMMARY"

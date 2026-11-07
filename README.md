@@ -143,32 +143,92 @@ Windows. Install the backend's development libraries before building.
 The `nsh` commands build the app's runners from the NSH crates `Cargo.toml` depends on: crates.io's at the version of
 the `nsh` you run (keep the `nsh-*` dependencies at that version when you upgrade `nsh`), or an NSH checkout's by path.
 
-## Windows release package
+## Desktop releases
 
-Publish a GitHub Release to automatically build and attach the Windows ZIP and
-its SHA-256 checksum to that release. The workflow checks out the release's tag;
-rerunning it replaces the matching release assets.
+Push a version tag to run [Desktop release](.github/workflows/release.yml).
+It tests and builds native launchers on each operating system, creates packages,
+and publishes a GitHub Release with generated notes only after **all five targets
+succeed**. No personal access token or release secret is required: publishing uses
+GitHub Actions' built-in repository token. Actions must be enabled in the repository.
 
-Push a stable semantic version tag such as `v0.1.0` (`vMAJOR.MINOR.PATCH`) to
-build the package, create a GitHub Release with generated notes if it does not
-already exist, and attach the ZIP and checksum. Keep the tag version aligned
-with the package version in `Cargo.toml`.
+| System | Architecture | Downloads |
+| --- | --- | --- |
+| Linux (Ubuntu 24.04 build baseline) | x64 and ARM64 | Portable tar archive and Debian package |
+| Windows | x64 | Portable ZIP |
+| macOS 11+ | Intel and Apple Silicon | App bundle ZIP and drag-to-Applications DMG |
 
-You can also run **Windows package** from the repository's GitHub **Actions** tab
-using **Run workflow**. Manual branch runs upload workflow artifacts only;
-manual runs against a version tag also publish release assets. The workflow builds the
-native Rust desktop launcher on `windows-latest` for `x86_64-pc-windows-msvc`,
-with release LTO and stripped symbols. It does not use Linux cross-packaging.
+Every filename includes the version, system, and architecture. Each download has
+an individual SHA-256 checksum; the release also includes a combined checksum
+manifest. Packages include the bundled Lucide font and third-party notices, and
+use the existing per-user database location.
 
-Download the `pomoterra-windows-x64` artifact from the completed run. It contains
-`pomoterra-windows-x64.zip` and its SHA-256 checksum. Extract the ZIP before
-running `pomoterra.exe`; keep the included third-party notices when redistributing.
-The launcher embeds the Lucide font and uses the normal per-user database location.
+### Publish a version
 
-Packaging fails unless both the build output and the executable extracted from
-the ZIP have valid MZ/PE headers, AMD64 machine type, PE32+ format, and the Windows
-GUI subsystem. The extracted executable must also match the build output's hash.
-These are structural checks, not a Windows UI smoke test. The package is unsigned.
+1. Set the same version in [Cargo.toml](Cargo.toml) and [nsh.json](nsh.json),
+   update the root package version in [Cargo.lock](Cargo.lock) by running Cargo,
+   and increment the app build number in [nsh.json](nsh.json).
+2. Commit and push those changes.
+3. Tag that commit and push the tag (for example, after setting version 0.1.2):
+
+```sh
+git tag v0.1.2
+git push origin v0.1.2
+```
+
+The tag must exactly match both package versions. Stable tags use
+`vMAJOR.MINOR.PATCH`; prerelease tags such as `v0.2.0-rc.1` create GitHub
+prereleases without marking them latest. Build-metadata suffixes are not supported.
+Validation runs before the build matrix, so mismatched versions fail early.
+
+You can also select **Actions → Desktop release → Run workflow**. A branch run
+only uploads workflow artifacts (retained for 30 days); selecting a matching
+version tag also publishes the release. Rerunning the same tag replaces its
+matching assets. New releases remain drafts until asset upload completes.
+Publishing a release manually does not trigger another build; push a tag or use
+the manual workflow instead. ARM Linux runners require repository access to
+GitHub's hosted ARM runners (available for public repositories).
+
+### Install and verify
+
+- **Windows:** extract the ZIP before launching the app.
+- **macOS:** open the architecture-specific DMG and drag Pomoterra into
+  Applications, or extract the app bundle ZIP. Bundles are ad-hoc signed for
+  integrity, **not Developer ID signed or notarized**. Gatekeeper may block them;
+  follow your organization's policy for unnotarized applications. Apple Silicon
+  and Intel downloads are separate, not universal binaries.
+- **Linux:** install the Debian package with your distribution's package installer
+  so dependencies are resolved, or extract the portable archive and run the
+  executable with GTK 4 and its runtime dependencies installed. Portable does
+  not mean statically linked. Packages are built on Ubuntu 24.04 and are not
+  guaranteed to run on older distributions. A StatusNotifier tray host is still
+  needed for close-to-tray behavior.
+
+To verify downloads on Linux, place the release files and checksum manifest in
+one directory and run:
+
+```sh
+sha256sum --check SHA256SUMS
+```
+
+Packaging checks native executable architecture (and Windows GUI subsystem),
+verifies archived executable hashes, extracts and checks Debian packages, and
+verifies macOS bundle signatures and disk images. These are structural checks,
+not native GUI smoke tests. Windows packages are unsigned; macOS packages are
+not notarized. App stores, Homebrew, Winget, APT repositories, Flatpak, mobile,
+and browser releases are **not** published by this workflow; these require
+separate distribution metadata, infrastructure, or signing credentials.
+
+The [packaging helper](.github/scripts/package.py) uses Python 3.11+ and the
+standard library. Run its local tests with:
+
+```sh
+python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
+python3 .github/scripts/package.py metadata --tag v0.1.2
+```
+
+Use the actual current version for the metadata check. Native package generation
+also requires the platform's build tools (Debian packaging tools on Linux and
+Apple command-line tools on macOS).
 
 ## Icons
 

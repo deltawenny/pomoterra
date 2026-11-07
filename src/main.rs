@@ -19,7 +19,7 @@ fn main() -> impl std::process::Termination {
         platform::AppOptions {
             title: "Pomoterra".to_owned(),
             #[cfg(any(target_os = "linux", target_os = "windows"))]
-            app_id: "com.example.pomoterra".to_owned(),
+            app_id: "com.deltawenny.pomoterra".to_owned(),
             size: nsh_app_pomoterra::MIN_WINDOW_SIZE,
             ..Default::default()
         },

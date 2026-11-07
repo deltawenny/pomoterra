@@ -1,2 +1,4 @@
 .nsh/
 target/
+dist/
+__pycache__/
