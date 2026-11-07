@@ -1,7 +1,8 @@
 use nsh_core::prelude::*;
 
-use super::{BLUE, GREY};
+use super::{BLUE, GREY, phase_color};
 use crate::icons::{Icon, icon};
+use crate::store::TimerState;
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum Tab {
@@ -10,7 +11,7 @@ pub(crate) enum Tab {
     History,
 }
 
-pub(crate) fn tab_header(selected: Signal<Tab>) -> View {
+pub(crate) fn tab_header(selected: Signal<Tab>, timer: Signal<TimerState>) -> View {
     view()
         .h(px(57.0))
         .flex_shrink_0()
@@ -18,13 +19,27 @@ pub(crate) fn tab_header(selected: Signal<Tab>) -> View {
         .border_b_1()
         .border_color(rgb(0xeeeeee))
         .justify_center()
-        .child(tab(selected, Tab::Config, "Config", Icon::Clock))
-        .child(tab(selected, Tab::Timer, "Timer", Icon::Timer))
-        .child(tab(selected, Tab::History, "History", Icon::History))
+        .child(tab(selected, timer, Tab::Config, "Config", Icon::Clock))
+        .child(tab(selected, timer, Tab::Timer, "Timer", Icon::Timer))
+        .child(tab(selected, timer, Tab::History, "History", Icon::History))
 }
 
-fn tab(selected: Signal<Tab>, tab: Tab, label: &'static str, name: Icon) -> View {
-    let color = move || if selected.get() == tab { BLUE } else { GREY };
+fn tab(
+    selected: Signal<Tab>,
+    timer: Signal<TimerState>,
+    tab: Tab,
+    label: &'static str,
+    name: Icon,
+) -> View {
+    let color = move || {
+        if selected.get() != tab {
+            GREY
+        } else if tab == Tab::Timer {
+            phase_color(timer.get().phase)
+        } else {
+            BLUE
+        }
+    };
     view()
         .w(px(85.0))
         .h_full()
@@ -34,7 +49,7 @@ fn tab(selected: Signal<Tab>, tab: Tab, label: &'static str, name: Icon) -> View
         .border_b_1()
         .border_color(move || {
             rgb(if selected.get() == tab {
-                BLUE
+                color()
             } else {
                 0xeeeeee
             })

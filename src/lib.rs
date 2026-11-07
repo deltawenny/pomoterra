@@ -151,7 +151,7 @@ pub fn App() -> impl IntoElement {
         .bg(rgb(0xffffff))
         .text_color(rgb(GREY))
         .p_safe_area()
-        .child(tab_header(selected))
+        .child(tab_header(selected, timer))
         .child(when(
             move || !library.get().error.is_empty(),
             move || {
