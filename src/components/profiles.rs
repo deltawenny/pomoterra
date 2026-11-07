@@ -175,7 +175,7 @@ pub(crate) fn profile_settings(
                     .accessibility_label("Currency")
                     .placeholder("Currency")
                     .empty(text("No matching currencies").text_size(px(12.0)).text_color(rgb(GREY)).p(px(12.0)))
-                    .popup_class("min-w-[88px] max-h-[280px] bg-white border border-[#dddddd] rounded-md p-1 shadow-lg")
+                    .popup_class("min-w-[88px] bg-white border border-[#dddddd] rounded-md p-1 shadow-lg")
                     .on_change(move |value: &Vec<SharedString>| { if let Some(value) = value.first() { library.update(|data| data.edit(active.get(), |p| p.currency = value.to_string())); } })))
                 .child(text("/ hour").text_size(px(11.0)))
         }))

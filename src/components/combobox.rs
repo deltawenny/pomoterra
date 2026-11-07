@@ -30,9 +30,11 @@ pub(super) fn combobox() -> ComboboxElement {
                 .child(icon(Icon::ChevronDown, GREY, 13.0)),
         )
         .popup_class(
-            "min-w-[200px] max-h-[280px] bg-white border border-[#dddddd] rounded-md p-1 shadow-lg",
+            "min-w-[200px] bg-white border border-[#dddddd] rounded-md p-1 shadow-lg",
         )
-        .list_class("min-h-0")
+        // Keep the popup's available-space max-height intact. Cap the scroll
+        // view instead so a tall dropdown cannot be shifted over its input.
+        .list_class("min-h-0 max-h-[270px]")
         .item_class(
             "group h-9 flex-col items-stretch justify-center px-3 rounded text-[#333333] focus:bg-[#edf6fc]",
         )
