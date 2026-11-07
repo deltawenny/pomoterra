@@ -109,6 +109,10 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
     if already_installed {
         return;
     }
+    let (width, height) = crate::MIN_WINDOW_SIZE;
+    window.set_size_request(width, height);
+    window.set_default_size(width, height);
+
     let Some(app) = window.application() else {
         return;
     };

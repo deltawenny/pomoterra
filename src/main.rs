@@ -20,7 +20,7 @@ fn main() -> impl std::process::Termination {
             title: "Pomoterra".to_owned(),
             #[cfg(any(target_os = "linux", target_os = "windows"))]
             app_id: "com.example.pomoterra".to_owned(),
-            size: (340, 515),
+            size: nsh_app_pomoterra::MIN_WINDOW_SIZE,
             ..Default::default()
         },
     )

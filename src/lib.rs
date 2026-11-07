@@ -60,8 +60,9 @@ fn flush_completed(timer: Signal<TimerState>, library: Signal<Library>, profile_
     }
 }
 
-const MAX_WIDTH: i32 = 340;
-const MAX_HEIGHT: i32 = 515 - 27;
+/// Minimum desktop content size in logical pixels, also used at startup.
+/// Native window decorations are added by each platform, not included here.
+pub const MIN_WINDOW_SIZE: (i32, i32) = (340, 488);
 
 // NSH 0.4 has no window-size constraints API. Apply GTK's native minimum
 // on its UI thread so this works with both `cargo run` and `nsh run`.
@@ -72,7 +73,6 @@ fn constrain_window_size() {
     gtk::glib::idle_add_once(|| {
         for window in gtk::Window::list_toplevels() {
             if let Ok(window) = window.downcast::<gtk::ApplicationWindow>() {
-                window.set_size_request(MAX_WIDTH, MAX_HEIGHT);
                 desktop::install(&window);
             }
         }

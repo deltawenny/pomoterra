@@ -1,7 +1,7 @@
 //! Win32 hooks marshal setup onto NSH's UI thread (not its engine thread).
 use super::native_tray::{Action, NativeTray};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     sync::{
         Once,
         atomic::{AtomicIsize, Ordering},
@@ -9,9 +9,10 @@ use std::{
     time::Duration,
 };
 use windows::Win32::{
-    Foundation::{HWND, LPARAM, LRESULT, WPARAM},
+    Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
     System::Threading::GetCurrentProcessId,
     UI::{
+        HiDpi::{AdjustWindowRectExForDpi, GetDpiForWindow},
         Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
         WindowsAndMessaging::*,
     },
@@ -20,7 +21,10 @@ use windows::core::BOOL;
 
 static START: Once = Once::new();
 static WINDOW: AtomicIsize = AtomicIsize::new(0);
-thread_local! { static TRAY: RefCell<Option<NativeTray>> = const { RefCell::new(None) }; }
+thread_local! {
+    static TRAY: RefCell<Option<NativeTray>> = const { RefCell::new(None) };
+    static SIZED: Cell<bool> = const { Cell::new(false) };
+}
 const SUBCLASS: usize = 0x504f4d4f;
 const TIMER: usize = 0x504f4d4f;
 
@@ -76,6 +80,25 @@ unsafe extern "system" fn setup_hook(code: i32, w: WPARAM, l: LPARAM) -> LRESULT
         if code >= 0 {
             let message = &*(l.0 as *const CWPSTRUCT);
             if message.hwnd.0 as isize == WINDOW.load(Ordering::Acquire) {
+                // The sizing subclass is independent of tray availability.
+                // Mark setup before SetWindowPos, which sends messages reentrantly.
+                if !SIZED.replace(true) {
+                    if !SetWindowSubclass(message.hwnd, Some(window_proc), SUBCLASS, 0).as_bool() {
+                        SIZED.set(false);
+                        return CallNextHookEx(None, code, w, l);
+                    }
+                    if let Some((width, height)) = minimum_outer_size(message.hwnd) {
+                        let _ = SetWindowPos(
+                            message.hwnd,
+                            None,
+                            0,
+                            0,
+                            width,
+                            height,
+                            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+                        );
+                    }
+                }
                 TRAY.with(|cell| {
                     // Tray creation sends Win32 messages synchronously and can
                     // re-enter this hook. Do not borrow the slot twice.
@@ -85,18 +108,8 @@ unsafe extern "system" fn setup_hook(code: i32, w: WPARAM, l: LPARAM) -> LRESULT
                     if slot.is_none() {
                         match NativeTray::new() {
                             Ok(tray) => {
-                                if SetWindowSubclass(message.hwnd, Some(window_proc), SUBCLASS, 0)
-                                    .as_bool()
-                                {
-                                    if SetTimer(Some(message.hwnd), TIMER, 100, None) != 0 {
-                                        *slot = Some(tray);
-                                    } else {
-                                        let _ = RemoveWindowSubclass(
-                                            message.hwnd,
-                                            Some(window_proc),
-                                            SUBCLASS,
-                                        );
-                                    }
+                                if SetTimer(Some(message.hwnd), TIMER, 100, None) != 0 {
+                                    *slot = Some(tray);
                                 }
                             }
                             Err(error) => {
@@ -111,6 +124,30 @@ unsafe extern "system" fn setup_hook(code: i32, w: WPARAM, l: LPARAM) -> LRESULT
     }
 }
 
+/// Convert the shared logical content minimum to a decorated, physical size.
+/// Query DPI for each request so moving between monitors keeps the same limits.
+unsafe fn minimum_outer_size(hwnd: HWND) -> Option<(i32, i32)> {
+    unsafe {
+        let dpi = GetDpiForWindow(hwnd).max(96);
+        let (width, height) = crate::MIN_WINDOW_SIZE;
+        let mut rect = RECT {
+            left: 0,
+            top: 0,
+            right: (f64::from(width) * f64::from(dpi) / 96.0).ceil() as i32,
+            bottom: (f64::from(height) * f64::from(dpi) / 96.0).ceil() as i32,
+        };
+        AdjustWindowRectExForDpi(
+            &mut rect,
+            WINDOW_STYLE(GetWindowLongW(hwnd, GWL_STYLE) as u32),
+            !GetMenu(hwnd).0.is_null(),
+            WINDOW_EX_STYLE(GetWindowLongW(hwnd, GWL_EXSTYLE) as u32),
+            dpi,
+        )
+        .ok()?;
+        Some((rect.right - rect.left, rect.bottom - rect.top))
+    }
+}
+
 unsafe extern "system" fn window_proc(
     hwnd: HWND,
     msg: u32,
@@ -121,7 +158,16 @@ unsafe extern "system" fn window_proc(
 ) -> LRESULT {
     unsafe {
         match msg {
-            WM_CLOSE => {
+            WM_GETMINMAXINFO => {
+                let result = DefSubclassProc(hwnd, msg, w, l);
+                if let Some((width, height)) = minimum_outer_size(hwnd) {
+                    let limits = &mut *(l.0 as *mut MINMAXINFO);
+                    limits.ptMinTrackSize.x = limits.ptMinTrackSize.x.max(width);
+                    limits.ptMinTrackSize.y = limits.ptMinTrackSize.y.max(height);
+                }
+                return result;
+            }
+            WM_CLOSE if TRAY.with(|tray| tray.try_borrow().is_ok_and(|tray| tray.is_some())) => {
                 let _ = ShowWindow(hwnd, SW_HIDE);
                 return LRESULT(0);
             }
@@ -148,6 +194,7 @@ unsafe extern "system" fn window_proc(
                 TRAY.with_borrow_mut(|tray| {
                     tray.take();
                 });
+                SIZED.set(false);
             }
             _ => {}
         }

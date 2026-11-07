@@ -8,10 +8,17 @@ use nsh_platform_macos::{
     objc2_app_kit::{NSApplication, NSWindow, NSWindowDelegate},
     objc2_foundation::{NSObject, NSObjectProtocol, NSSize},
 };
-use std::{cell::RefCell, sync::Once, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    sync::Once,
+    time::Duration,
+};
 
 static START: Once = Once::new();
-thread_local! { static STATE: RefCell<Option<State>> = const { RefCell::new(None) }; }
+thread_local! {
+    static STATE: RefCell<Option<State>> = const { RefCell::new(None) };
+    static SIZED: Cell<bool> = const { Cell::new(false) };
+}
 
 struct State {
     tray: NativeTray,
@@ -60,13 +67,19 @@ fn poll() {
             let Some(window) = app.windows().iter().find(|window| window.isVisible()) else {
                 return;
             };
+            // Sizing must still work when no status item can be created.
+            if !SIZED.replace(true) {
+                let (width, height) = crate::MIN_WINDOW_SIZE;
+                let size = NSSize::new(f64::from(width), f64::from(height));
+                window.setContentMinSize(size);
+                window.setContentSize(size);
+            }
             match NativeTray::new() {
                 Ok(tray) => {
                     let delegate: Retained<WindowDelegate> =
                         unsafe { msg_send![WindowDelegate::alloc(mtm), init] };
                     let original = window.delegate();
                     window.setDelegate(Some(ProtocolObject::from_ref(&*delegate)));
-                    window.setContentMinSize(NSSize::new(340.0, 488.0));
                     *slot = Some(State {
                         tray,
                         window,
