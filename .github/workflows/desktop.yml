@@ -5,7 +5,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-24.04, windows-2022, macos-15]
+        backend: [native, gpui]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -14,7 +15,7 @@ jobs:
           components: rustfmt
       - name: Install Linux backend dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libpango1.0-dev libegl1-mesa-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libpango1.0-dev libegl1-mesa-dev clang libclang-dev pkg-config libfontconfig-dev libfreetype-dev libwayland-dev libx11-xcb-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libzstd-dev libvulkan-dev
       - run: cargo fmt --check
-      - run: cargo check --all-targets --locked
-      - run: cargo test --lib --locked
+      - run: cargo check --all-targets --locked --no-default-features --features ${{ matrix.backend }}
+      - run: cargo test --lib --locked --no-default-features --features ${{ matrix.backend }}

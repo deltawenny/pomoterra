@@ -166,7 +166,7 @@ def package(root, target, platform, arch):
                     "CFBundleIdentifier": info["id"], "CFBundleExecutable": "pomoterra",
                     "CFBundlePackageType": "APPL", "CFBundleShortVersionString": version.split("-")[0],
                     "CFBundleVersion": str(json.loads((root / "nsh.json").read_text())["build"]),
-                    "LSMinimumSystemVersion": "11.0", "NSHighResolutionCapable": True,
+                    "LSMinimumSystemVersion": "14.0", "NSHighResolutionCapable": True,
                 }, handle)
             subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
             subprocess.run(["codesign", "--verify", "--strict", str(app)], check=True)

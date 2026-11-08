@@ -1,24 +1,28 @@
-//! Runs the Rust application directly on the machine's native backend.
+//! Runs the Rust root in a GPUI host (`gpui`) or the native backend (default).
 
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
-#[cfg(target_os = "linux")]
+#[cfg(feature = "gpui")]
+use nsh_platform_gpui as platform;
+#[cfg(all(not(feature = "gpui"), target_os = "linux"))]
 use nsh_platform_linux as platform;
-#[cfg(target_os = "macos")]
+#[cfg(all(not(feature = "gpui"), target_os = "macos"))]
 use nsh_platform_macos as platform;
-#[cfg(target_os = "windows")]
+#[cfg(all(not(feature = "gpui"), target_os = "windows"))]
 use nsh_platform_windows as platform;
 
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 fn main() -> impl std::process::Termination {
     env_logger::init();
+    #[cfg(feature = "gpui")]
+    platform::set_ui_sets(vec![nsh_base::registry(), nsh_app_pomoterra::registry()]);
     platform::run_app(
         platform::AppSource::Rust(
             platform::Root::of::<nsh_app_pomoterra::App>().font(lucide_icons::LUCIDE_FONT_BYTES),
         ),
         platform::AppOptions {
             title: "Pomoterra".to_owned(),
-            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            #[cfg(any(feature = "gpui", target_os = "linux", target_os = "windows"))]
             app_id: "com.deltawenny.pomoterra".to_owned(),
             size: nsh_app_pomoterra::MIN_WINDOW_SIZE,
             ..Default::default()

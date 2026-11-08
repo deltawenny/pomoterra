@@ -15,7 +15,12 @@ countdown state are kept in memory for the current app run. Completed focus sess
 
 ## Background operation and tray
 
-On Linux, Windows, and macOS, closing the window hides it to the system tray
+The default native-backend build has the tray integration described below.
+**GPUI release builds currently do not install these native-backend hooks:** closing
+the GPUI window exits the app, and native minimum-window-size enforcement is not
+installed. Keep the GPUI window open for timers and scheduled breaks to continue.
+
+On Linux, Windows, and macOS, closing the native-backend window hides it to the system tray
 (macOS menu bar) instead of
 stopping the app. An active timer and scheduled breaks continue working while
 hidden; restoring the window preserves the current timer, settings, and note.
@@ -146,7 +151,7 @@ the `nsh` you run (keep the `nsh-*` dependencies at that version when you upgrad
 ## Desktop releases
 
 Push a version tag to run [Desktop release](.github/workflows/release.yml).
-It tests and builds native launchers on each operating system, creates packages,
+It tests and builds a **GPUI host** on each operating system, creates packages,
 and publishes a GitHub Release with generated notes only after **all five targets
 succeed**. No personal access token or release secret is required: publishing uses
 GitHub Actions' built-in repository token. Actions must be enabled in the repository.
@@ -155,12 +160,40 @@ GitHub Actions' built-in repository token. Actions must be enabled in the reposi
 | --- | --- | --- |
 | Linux (Ubuntu 24.04 build baseline) | x64 and ARM64 | Portable tar archive and Debian package |
 | Windows | x64 | Portable ZIP |
-| macOS 11+ | Intel and Apple Silicon | App bundle ZIP and drag-to-Applications DMG |
+| macOS 14+ | Intel and Apple Silicon | App bundle ZIP and drag-to-Applications DMG |
 
 Every filename includes the version, system, and architecture. Each download has
 an individual SHA-256 checksum; the release also includes a combined checksum
 manifest. Packages include the bundled Lucide font and third-party notices, and
 use the existing per-user database location.
+
+### GPUI host and local builds
+
+The [GPUI integration guide](https://nsh.dev/docs/gpui/) describes embedding a Rust
+root in a GPUI host. [src/main.rs](src/main.rs) does this using NSH's GPUI
+launcher; the release workflow selects it with:
+
+```sh
+cargo run --no-default-features --features gpui
+cargo build --release --locked --no-default-features --features gpui
+```
+
+Plain `cargo run` retains the existing native launcher and its tray integration.
+`nsh package` still builds NSH's OS-native runners, not this GPUI host. The release
+workflow deliberately builds our executable and packages it with the existing
+[packaging helper](.github/scripts/package.py). Desktop CI checks both backends.
+GPUI uses Metal on macOS, DirectX on Windows, and Vulkan on Linux. Its
+runtime-shaders feature compiles Metal shaders at startup, so CI does not need to
+download Xcode's Metal Toolchain. Web views, video, and the JavaScript runtime are
+not enabled in this Rust-only GPUI host.
+
+Linux GPUI build prerequisites (Ubuntu 24.04):
+
+```sh
+sudo apt-get install clang libclang-dev pkg-config libfontconfig-dev libfreetype-dev \
+  libwayland-dev libx11-xcb-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+  libzstd-dev libvulkan-dev
+```
 
 ### Publish a version
 
@@ -197,11 +230,11 @@ GitHub's hosted ARM runners (available for public repositories).
   follow your organization's policy for unnotarized applications. Apple Silicon
   and Intel downloads are separate, not universal binaries.
 - **Linux:** install the Debian package with your distribution's package installer
-  so dependencies are resolved, or extract the portable archive and run the
-  executable with GTK 4 and its runtime dependencies installed. Portable does
-  not mean statically linked. Packages are built on Ubuntu 24.04 and are not
-  guaranteed to run on older distributions. A StatusNotifier tray host is still
-  needed for close-to-tray behavior.
+  so linked-library dependencies are resolved, or extract the portable archive.
+  GPUI also requires a working Vulkan driver, Wayland or X11, and libxkbcommon.
+  Portable does not mean statically linked. Packages are built on Ubuntu 24.04
+  and are not guaranteed to run on older distributions. GPUI releases currently
+  have no close-to-tray behavior.
 
 To verify downloads on Linux, place the release files and checksum manifest in
 one directory and run:

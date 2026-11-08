@@ -4,7 +4,11 @@ mod icons;
 mod persistence;
 mod store;
 
-#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+#[cfg(all(
+    feature = "native",
+    not(feature = "gpui"),
+    any(target_os = "linux", target_os = "windows", target_os = "macos")
+))]
 mod desktop;
 
 use chrono::{Datelike, Local, Timelike};
@@ -66,7 +70,7 @@ pub const MIN_WINDOW_SIZE: (i32, i32) = (340, 488);
 
 // NSH 0.4 has no window-size constraints API. Apply GTK's native minimum
 // on its UI thread so this works with both `cargo run` and `nsh run`.
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "native", not(feature = "gpui"), target_os = "linux"))]
 fn constrain_window_size() {
     use nsh_platform_linux::gtk4::{self as gtk, prelude::*};
 
@@ -82,9 +86,13 @@ fn constrain_window_size() {
 /// The operating system supplies the window chrome.
 #[component]
 pub fn App() -> impl IntoElement {
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "native", not(feature = "gpui"), target_os = "linux"))]
     constrain_window_size();
-    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    #[cfg(all(
+        feature = "native",
+        not(feature = "gpui"),
+        any(target_os = "windows", target_os = "macos")
+    ))]
     desktop::install();
 
     let loaded = Library::load();

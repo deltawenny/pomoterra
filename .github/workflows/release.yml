@@ -85,11 +85,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libpango1.0-dev libegl1-mesa-dev dpkg-dev
-      - name: Run native unit tests
-        run: cargo test --lib --locked --target ${{ matrix.target }}
-      - name: Build native desktop launcher
-        run: cargo build --locked --release --target ${{ matrix.target }} --bin nsh-app-pomoterra
+          sudo apt-get install -y clang libclang-dev pkg-config libfontconfig-dev libfreetype-dev libwayland-dev libx11-xcb-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libzstd-dev libvulkan-dev dpkg-dev
+      - name: Run GPUI application unit tests
+        run: cargo test --lib --locked --no-default-features --features gpui --target ${{ matrix.target }}
+      - name: Build GPUI desktop host
+        run: cargo build --locked --release --no-default-features --features gpui --target ${{ matrix.target }} --bin nsh-app-pomoterra
       - name: Create and verify distributables
         run: python .github/scripts/package.py package --target ${{ matrix.target }} --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
       - name: Upload distributables
