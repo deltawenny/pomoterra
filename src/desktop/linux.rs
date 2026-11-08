@@ -109,6 +109,23 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
     if already_installed {
         return;
     }
+    // The app paints an opaque rectangular surface. Theme-provided window
+    // rounding otherwise clips its extreme corners and exposes black pixels
+    // on X11 captures and at the content/title-bar seam on some desktops.
+    // Leave the window manager's outer decorations and all UI controls alone.
+    window.add_css_class("pomoterra-window");
+    let provider = gtk::CssProvider::new();
+    provider.load_from_string(
+        "window.pomoterra-window, window.pomoterra-window > decoration {\n\
+         border-radius: 0; border: none; box-shadow: none; outline: none;\n\
+         background-color: #ffffff; }",
+    );
+    gtk::style_context_add_provider_for_display(
+        &gtk::prelude::WidgetExt::display(window),
+        &provider,
+        gtk::STYLE_PROVIDER_PRIORITY_USER + 1,
+    );
+
     let (width, height) = crate::MIN_WINDOW_SIZE;
     window.set_size_request(width, height);
     window.set_default_size(width, height);
