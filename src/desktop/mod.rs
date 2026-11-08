@@ -15,28 +15,46 @@ pub(crate) use macos::install;
 #[cfg(target_os = "windows")]
 pub(crate) use windows::install;
 
-/// Render a catalog glyph to RGBA, shared by all three desktop backends.
+/// Scale the bundled 64px application logo for native tray backends.
 fn icon_rgba(size: usize) -> Result<Vec<u8>, String> {
-    let font = fontdue::Font::from_bytes(
-        lucide_icons::LUCIDE_FONT_BYTES,
-        fontdue::FontSettings::default(),
-    )
-    .map_err(str::to_owned)?;
-    let (metrics, bitmap) =
-        font.rasterize(char::from(lucide_icons::Icon::Timer), size as f32 * 0.8);
+    const SOURCE: &[u8; 64 * 64 * 4] = include_bytes!("../../assets/icons/pomoterra.rgba");
+    if size == 0 || size > 256 {
+        return Err("Tray icon size must be between 1 and 256".into());
+    }
     let mut data = vec![0; size * size * 4];
-    let left = size.saturating_sub(metrics.width) / 2;
-    let top = size.saturating_sub(metrics.height) / 2;
-    for y in 0..metrics.height.min(size) {
-        for x in 0..metrics.width.min(size) {
-            let offset = ((top + y) * size + left + x) * 4;
-            data[offset..offset + 4].copy_from_slice(&[
-                0x26,
-                0x86,
-                0xeb,
-                bitmap[y * metrics.width + x],
-            ]);
+    // Area averaging preserves the logo's thin lines at small tray sizes.
+    for y in 0..size {
+        for x in 0..size {
+            let mut sum = [0_u32; 4];
+            let mut count = 0;
+            for sy in y * 64 / size..((y + 1) * 64 / size).max(y * 64 / size + 1) {
+                for sx in x * 64 / size..((x + 1) * 64 / size).max(x * 64 / size + 1) {
+                    let pixel = &SOURCE[(sy * 64 + sx) * 4..][..4];
+                    for channel in 0..4 {
+                        sum[channel] += u32::from(pixel[channel]);
+                    }
+                    count += 1;
+                }
+            }
+            for channel in 0..4 {
+                data[(y * size + x) * 4 + channel] = (sum[channel] / count) as u8;
+            }
         }
     }
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn logo_pixels_have_expected_dimensions_and_transparency() {
+        for size in [16, 24, 32, 48, 64, 128, 256] {
+            let pixels = super::icon_rgba(size).unwrap();
+            assert_eq!(pixels.len(), size * size * 4);
+            assert_eq!(pixels[3], 0);
+            assert!(pixels.chunks_exact(4).any(|pixel| pixel[3] == 255));
+        }
+        assert!(super::icon_rgba(0).is_err());
+        assert!(super::icon_rgba(257).is_err());
+    }
 }

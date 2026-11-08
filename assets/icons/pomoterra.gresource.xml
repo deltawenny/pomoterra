@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/com/deltawenny/pomoterra/icons">
+    <file alias="256x256/apps/com.deltawenny.pomoterra.png">pomoterra.png</file>
+  </gresource>
+</gresources>

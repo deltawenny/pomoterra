@@ -85,6 +85,50 @@ class PackagingTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 packaging.verify_binary(binary, "windows", "x64")
 
+    def test_linux_desktop_icon_matches_application_id(self):
+        self.write_metadata()
+        icons = self.root / "assets/icons"
+        icons.mkdir(parents=True)
+        (icons / "pomoterra.png").write_bytes(b"png")
+        logo = self.root / ".github/assets/logo.svg"
+        logo.parent.mkdir(parents=True)
+        logo.write_text("<svg/>")
+        destination = self.root / "share"
+        packaging.install_linux_desktop(self.root, destination)
+        app_id = "com.deltawenny.pomoterra"
+        desktop = (destination / f"applications/{app_id}.desktop").read_text()
+        self.assertIn(f"Icon={app_id}\n", desktop)
+        self.assertIn(f"StartupWMClass={app_id}\n", desktop)
+        self.assertEqual(
+            (destination / f"icons/hicolor/scalable/apps/{app_id}.svg").read_text(),
+            "<svg/>",
+        )
+        self.assertEqual(
+            (destination / f"icons/hicolor/256x256/apps/{app_id}.png").read_bytes(), b"png",
+        )
+
+    def test_checked_in_icon_formats(self):
+        icons = packaging.ROOT / "assets/icons"
+        png = (icons / "pomoterra.png").read_bytes()
+        self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(struct.unpack_from(">II", png, 16), (256, 256))
+        self.assertEqual(len((icons / "pomoterra.rgba").read_bytes()), 64 * 64 * 4)
+        ico = (icons / "pomoterra.ico").read_bytes()
+        self.assertEqual(struct.unpack_from("<HHH", ico), (0, 1, 7))
+        icns = (icons / "pomoterra.icns").read_bytes()
+        self.assertEqual(icns[:4], b"icns")
+        self.assertEqual(struct.unpack_from(">I", icns, 4)[0], len(icns))
+        offset = 8
+        sizes = []
+        while offset < len(icns):
+            size = struct.unpack_from(">I", icns, offset + 4)[0]
+            self.assertGreater(size, 8)
+            self.assertEqual(icns[offset + 8:offset + 16], b"\x89PNG\r\n\x1a\n")
+            sizes.append(struct.unpack_from(">II", icns, offset + 24))
+            offset += size
+        self.assertEqual(offset, len(icns))
+        self.assertEqual(sizes, [(s, s) for s in (16, 32, 64, 128, 256, 512, 1024)])
+
     def test_archives_preserve_binary(self):
         stage = self.root / "pomoterra-test"
         stage.mkdir()

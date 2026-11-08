@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Pomoterra logo</title>
+  <desc id="desc">A blue focus timer with rolling terrain and a green sprout, representing time for growth.</desc>
+  <defs>
+    <clipPath id="terrain">
+      <circle cx="32" cy="36" r="18"/>
+    </clipPath>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#192b35"/>
+  <path d="M32 15V9" fill="none" stroke="#f4f8fb" stroke-width="4" stroke-linecap="round"/>
+  <path d="M32 15C32 7 39 5 46 7C45 14 39 18 32 15Z" fill="#70d6a0"/>
+  <circle cx="32" cy="36" r="21" fill="#123e53" stroke="#009fff" stroke-width="4"/>
+  <g clip-path="url(#terrain)">
+    <path d="M11 46C20 35 29 38 38 44S51 48 56 40V58H11Z" fill="#009fff"/>
+    <path d="M10 52C23 42 35 55 55 45" fill="none" stroke="#70d6a0" stroke-width="2.5"/>
+  </g>
+  <path d="M32 24V35L39 31" fill="none" stroke="#f4f8fb" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

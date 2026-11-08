@@ -88,6 +88,26 @@ def make_tar(directory, output, executable):
         raise ValueError("Archived executable differs from the staged executable")
 
 
+def install_linux_desktop(root, destination):
+    """Stage desktop integration under a share directory (system or portable)."""
+    app_id = metadata(root)["id"]
+    desktop = destination / "applications" / f"{app_id}.desktop"
+    desktop.parent.mkdir(parents=True, exist_ok=True)
+    desktop.write_text(
+        "[Desktop Entry]\nType=Application\nName=Pomoterra\n"
+        "Comment=Pomodoro focus timer\nExec=pomoterra\nTerminal=false\n"
+        f"Icon={app_id}\nCategories=Utility;Clock;\nStartupWMClass={app_id}\n"
+    )
+    icons = destination / "icons/hicolor"
+    for folder, source in (
+        ("scalable", root / ".github/assets/logo.svg"),
+        ("256x256", root / "assets/icons/pomoterra.png"),
+    ):
+        target = icons / folder / "apps" / f"{app_id}{source.suffix}"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+
+
 def make_deb(root, work, source, output, version, arch):
     package = work / "deb"
     binary = package / "usr/bin/pomoterra"
@@ -97,13 +117,7 @@ def make_deb(root, work, source, output, version, arch):
     docs = package / "usr/share/doc/pomoterra"
     docs.mkdir(parents=True)
     shutil.copy2(root / "THIRD_PARTY_NOTICES.md", docs)
-    desktop = package / "usr/share/applications/pomoterra.desktop"
-    desktop.parent.mkdir(parents=True)
-    desktop.write_text(
-        "[Desktop Entry]\nType=Application\nName=Pomoterra\n"
-        "Comment=Pomodoro focus timer\nExec=pomoterra\nTerminal=false\n"
-        "Categories=Utility;Clock;\nStartupWMClass=com.deltawenny.pomoterra\n"
-    )
+    install_linux_desktop(root, package / "usr/share")
     # Let the native runner resolve exact shared-library package requirements.
     debian = work / "debian"
     debian.mkdir()
@@ -160,12 +174,14 @@ def package(root, target, platform, arch):
             shutil.copy2(source, executable)
             executable.chmod(0o755)
             shutil.copy2(root / "THIRD_PARTY_NOTICES.md", contents / "Resources")
+            shutil.copy2(root / "assets/icons/pomoterra.icns", contents / "Resources")
             with (contents / "Info.plist").open("wb") as handle:
                 plistlib.dump({
                     "CFBundleName": "Pomoterra", "CFBundleDisplayName": "Pomoterra",
                     "CFBundleIdentifier": info["id"], "CFBundleExecutable": "pomoterra",
                     "CFBundlePackageType": "APPL", "CFBundleShortVersionString": version.split("-")[0],
                     "CFBundleVersion": str(json.loads((root / "nsh.json").read_text())["build"]),
+                    "CFBundleIconFile": "pomoterra.icns",
                     "LSMinimumSystemVersion": "14.0", "NSHighResolutionCapable": True,
                 }, handle)
             subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
@@ -189,6 +205,7 @@ def package(root, target, platform, arch):
                 make_zip(stage, archive, executable)
             else:
                 executable.chmod(0o755)
+                install_linux_desktop(root, stage / "share")
                 archive = dist / f"{name}.tar.gz"
                 make_tar(stage, archive, executable)
                 deb = dist / f"{name}.deb"

@@ -74,7 +74,7 @@ impl ksni::Tray for Tray {
     }
 }
 
-/// Render the same bundled Lucide catalog used by the UI into SNI's ARGB pixels.
+/// Convert the bundled application logo into SNI's ARGB pixels.
 fn tray_icons() -> Result<Vec<ksni::Icon>, String> {
     [24, 32, 48]
         .into_iter()
@@ -90,6 +90,25 @@ fn tray_icons() -> Result<Vec<ksni::Icon>, String> {
             })
         })
         .collect()
+}
+
+/// Make the app icon available without requiring an installed icon theme entry.
+fn install_app_icon(window: &gtk::ApplicationWindow) {
+    static REGISTER: std::sync::Once = std::sync::Once::new();
+    REGISTER.call_once(|| {
+        gtk::gio::resources_register_include!("pomoterra.gresource")
+            .expect("register bundled Pomoterra icon");
+    });
+    let theme = gtk::IconTheme::for_display(&gtk::prelude::WidgetExt::display(window));
+    let path = "/com/deltawenny/pomoterra/icons";
+    if !theme
+        .resource_path()
+        .iter()
+        .any(|existing| existing == path)
+    {
+        theme.add_resource_path(path);
+    }
+    window.set_icon_name(Some("com.deltawenny.pomoterra"));
 }
 
 /// Install once per native window, including windows created by NSH runners.
@@ -109,6 +128,7 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
     if already_installed {
         return;
     }
+    install_app_icon(window);
     // The app paints an opaque rectangular surface. Theme-provided window
     // rounding otherwise clips its extreme corners and exposes black pixels
     // on X11 captures and at the content/title-bar seam on some desktops.
@@ -214,6 +234,31 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires a display; run with xvfb-run"]
+    fn bundled_app_icon_is_available_without_installation() {
+        gtk::init().expect("initialize GTK");
+        let window = gtk::ApplicationWindow::builder().build();
+        install_app_icon(&window);
+        install_app_icon(&window);
+        assert_eq!(
+            window.icon_name().as_deref(),
+            Some("com.deltawenny.pomoterra")
+        );
+        let theme = gtk::IconTheme::for_display(&gtk::prelude::WidgetExt::display(&window));
+        assert!(theme.has_icon("com.deltawenny.pomoterra"));
+        let bytes = gtk::gio::resources_lookup_data(
+            "/com/deltawenny/pomoterra/icons/256x256/apps/com.deltawenny.pomoterra.png",
+            gtk::gio::ResourceLookupFlags::NONE,
+        )
+        .expect("bundled logo exists");
+        assert_eq!(
+            bytes.as_ref(),
+            include_bytes!("../../assets/icons/pomoterra.png")
+        );
+        window.close();
+    }
 
     #[test]
     #[ignore = "requires a display and a session D-Bus StatusNotifier host"]
