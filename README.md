@@ -67,7 +67,7 @@
 
 - **Local persistence** — profiles, settings, schedules, and completed sessions are saved in a local SQLite database.
 
-- **Native desktop tray support** — native-backend builds can keep working when you close the window to the tray. **Packaged GPUI releases currently exit when their window closes**; keep the window open for timers and scheduled breaks to continue.
+- **Native desktop tray support** — packaged desktop builds keep working when you close the window to the system tray or menu bar. Timers and scheduled breaks continue while the window is hidden.
 
 ## :computer: Installation
 
@@ -85,7 +85,7 @@ Download a package for your system from the **[latest release](https://github.co
 
 Every download includes a SHA-256 checksum. See the [installation and verification guide](docs/technical-guide.md#install-and-verify) for details and platform limitations.
 
-> **Keep the app open:** release packages use the GPUI backend, which does not currently support close-to-tray. A closed app cannot run timers or scheduled breaks.
+> **Background operation:** closing the window hides the app to the system tray or macOS menu bar when a tray host is available. On Linux, a StatusNotifier-compatible tray host is required; if unavailable, closing exits normally.
 
 ## :hammer_and_wrench: Development
 

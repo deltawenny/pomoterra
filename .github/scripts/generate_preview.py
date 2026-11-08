@@ -36,7 +36,7 @@ def generate(
     output: Path,
     height: int = 440,
     overlap: float = 0.42,
-    padding: int = 60,
+    padding: int = 30,
     gap: int = 45,
 ) -> None:
     """Input order is left to right; the middle screenshot is in front."""
@@ -93,7 +93,7 @@ def generate(
         row_height = height + 60
         canvas_height = padding * 2 + len(rows) * row_height + (len(rows) - 1) * gap
         canvas = temp / "canvas.png"
-        run("-size", f"{canvas_width}x{canvas_height}", "xc:white", "-type", "TrueColor", f"PNG24:{canvas}")
+        run("-size", f"{canvas_width}x{canvas_height}", "xc:none", "-type", "TrueColorMatte", f"PNG32:{canvas}")
         for row_index, (row_width, cards) in enumerate(layouts):
             left = padding + (canvas_width - padding * 2 - row_width) // 2
             top = padding + row_index * (row_height + gap)
@@ -199,7 +199,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=ROOT / ".github/assets/preview.png")
     parser.add_argument("--height", type=positive, default=440, help="front screenshot height (default: 440)")
     parser.add_argument("--overlap", type=float, default=0.42, help="overlap fraction, 0–0.75 (default: 0.42)")
-    parser.add_argument("--padding", type=positive, default=60)
+    parser.add_argument("--padding", type=positive, default=30)
     parser.add_argument("--gap", type=positive, default=45, help="space between rows")
     parser.add_argument("--update-readme", action="store_true",
                         help="replace the README illustration with the generated screenshot preview")

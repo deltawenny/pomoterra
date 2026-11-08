@@ -42,7 +42,7 @@ class PreviewTests(unittest.TestCase):
                 ).split()
                 self.assertEqual(result[0], "PNG")
                 self.assertGreater(int(result[1]), 200)
-                self.assertEqual(int(result[2]), 120 + len(rows) * 220 + (len(rows) - 1) * 45)
+                self.assertEqual(int(result[2]), 60 + len(rows) * 220 + (len(rows) - 1) * 45)
             self.assertEqual(original, [p.read_bytes() for p in images])
             with self.assertRaisesRegex(ValueError, "overwrite"):
                 preview.generate([images], images[0])
