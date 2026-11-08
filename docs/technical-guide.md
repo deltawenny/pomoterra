@@ -203,11 +203,11 @@ sudo apt-get install clang libclang-dev pkg-config libfontconfig-dev libfreetype
    update the root package version in [Cargo.lock](../Cargo.lock) by running Cargo,
    and increment the app build number in [nsh.json](../nsh.json).
 2. Commit and push those changes.
-3. Tag that commit and push the tag (for example, after setting version 0.1.2):
+3. Tag that commit and push the tag (for example, after setting version 0.1.3):
 
 ```sh
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.1.3
+git push origin v0.1.3
 ```
 
 The tag must exactly match both package versions. Stable tags use
@@ -258,7 +258,7 @@ standard library. Run its local tests with:
 
 ```sh
 python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
-python3 .github/scripts/package.py metadata --tag v0.1.2
+python3 .github/scripts/package.py metadata --tag v0.1.3
 ```
 
 Use the actual current version for the metadata check. Native package generation
