@@ -167,6 +167,10 @@ fn calendar(sessions: &[Session], profile_id: i64) -> View {
                 .h(px(108.0))
                 .child(
                     view()
+                        .w_full()
+                        .flex_row()
+                        .justify_center()
+                        .child(view()
                         .flex_row()
                         .gap(px(3.0))
                         .children((0..weeks).map(move |week| {
@@ -221,7 +225,7 @@ fn calendar(sessions: &[Session], profile_id: i64) -> View {
                                         })
                                         .collect::<Vec<_>>(),
                                 )
-                        })),
+                        }))),
                 ),
         )
         .child(text("Less  ░ ▒ ▓ █  More · colors show profiles").text_size(px(10.0)))
