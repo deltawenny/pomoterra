@@ -18,9 +18,12 @@ pub(crate) fn action(label: &'static str, glyph: Icon, run: impl Fn() + 'static)
         .flex_shrink_0()
         .items_center()
         .justify_center()
+        .rounded(px(5.0))
         .role(AccessibilityRole::Button)
         .label(label)
         .on_press(run)
+        .hover(|s| s.bg(rgb(0xf0f6fa)))
+        .active(|s| s.bg(rgb(0xe3eff7)))
         .child(icon(glyph, GREY, 15.0))
 }
 
@@ -136,9 +139,16 @@ pub(crate) fn profile_settings(
                 if library.get().error.is_empty() { editing.set(false); }
             }))
             .child(action("Cancel rename", Icon::X, move || editing.set(false)))))
-        .child(when(move || deleting.get(), move || view().gap(px(8.0))
-            .child(text("Delete this profile? Its history will be kept.").text_size(px(12.0)))
-            .child(view().flex_row().gap(px(12.0))
+        .child(when(move || deleting.get(), move || view()
+            .gap(px(8.0))
+            .p(px(10.0))
+            .border_1()
+            .border_color(rgb(0xe0b4b4))
+            .rounded(px(6.0))
+            .bg(rgb(0xfff8f8))
+            .child(text("Delete this profile?").text_size(px(12.0)).text_color(rgb(0x6f2222)))
+            .child(text("Its history will be kept.").text_size(px(12.0)).text_color(rgb(0x555555)))
+            .child(view().flex_row().gap(px(8.0))
                 .child(text_button("Confirm delete", move || {
                     let data = library.get();
                     if data.profiles.len() <= 1 {
@@ -203,7 +213,11 @@ pub(crate) fn text_button(label: &'static str, run: impl Fn() + 'static) -> View
         .role(AccessibilityRole::Button)
         .label(label)
         .on_press(run)
+        .px(px(8.0))
         .py(px(5.0))
+        .rounded(px(4.0))
+        .hover(|s| s.bg(rgb(0xeaf5fb)))
+        .active(|s| s.bg(rgb(0xdceef8)))
         .child(text(label).text_size(px(12.0)).text_color(rgb(BLUE)))
 }
 
