@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use super::tray_image::TrayState;
 use ksni::blocking::TrayMethods;
 use nsh_platform_linux::gtk4::{self as gtk, glib, prelude::*};
 
@@ -74,12 +75,12 @@ impl ksni::Tray for Tray {
     }
 }
 
-/// Convert the bundled application logo into SNI's ARGB pixels.
-fn tray_icons() -> Result<Vec<ksni::Icon>, String> {
+/// Convert the timer glyph into SNI's ARGB pixels.
+fn tray_icons(state: TrayState) -> Result<Vec<ksni::Icon>, String> {
     [24, 32, 48]
         .into_iter()
         .map(|size| {
-            let mut data = super::icon_rgba(size)?;
+            let mut data = super::tray_image::icon_rgba(size, state)?;
             for pixel in data.chunks_exact_mut(4) {
                 pixel.rotate_right(1); // SNI uses network-order ARGB, not RGBA.
             }
@@ -176,9 +177,46 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
     app.add_action(&quit);
     app.set_accels_for_action("app.quit", &["<Control>q"]);
 
+    // The appearance portal follows the desktop's system preference on GNOME,
+    // KDE and other portal-enabled desktops, independently of our white UI.
+    let appearance = std::sync::Arc::new(std::sync::atomic::AtomicU8::new(0));
+    let portal_appearance = appearance.clone();
+    std::thread::spawn(move || {
+        if let Ok(bus) =
+            gtk::gio::bus_get_sync(gtk::gio::BusType::Session, gtk::gio::Cancellable::NONE)
+        {
+            loop {
+                let result = bus.call_sync(
+                    Some("org.freedesktop.portal.Desktop"),
+                    "/org/freedesktop/portal/desktop",
+                    "org.freedesktop.portal.Settings",
+                    "Read",
+                    Some(&("org.freedesktop.appearance", "color-scheme").to_variant()),
+                    None,
+                    gtk::gio::DBusCallFlags::NONE,
+                    1000,
+                    gtk::gio::Cancellable::NONE,
+                );
+                let preference = result
+                    .ok()
+                    .and_then(|reply| reply.child_value(0).as_variant())
+                    .and_then(|value| value.get::<u32>());
+                portal_appearance.store(
+                    match preference {
+                        Some(1) => 2,
+                        Some(2) => 1,
+                        _ => 0,
+                    },
+                    std::sync::atomic::Ordering::Relaxed,
+                );
+                std::thread::sleep(Duration::from_secs(2));
+            }
+        }
+    });
+
     let (events, receiver) = mpsc::channel();
     std::thread::spawn(move || {
-        let result = tray_icons().and_then(|icons| {
+        let result = tray_icons(TrayState::current()).and_then(|icons| {
             Tray {
                 events: events.clone(),
                 icons,
@@ -191,6 +229,7 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
 
     let weak_window = window.downgrade();
     let mut handle: Option<ksni::blocking::Handle<Tray>> = None;
+    let mut rendered_state = None;
     glib::timeout_add_local(Duration::from_millis(100), move || {
         let Some(window) = weak_window.upgrade() else {
             if let Some(handle) = handle.take() {
@@ -226,6 +265,25 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
             available.set(false);
             window.present();
             return glib::ControlFlow::Break;
+        }
+        if let Some(tray) = &handle {
+            let dark = match appearance.load(std::sync::atomic::Ordering::Relaxed) {
+                2 => true,
+                1 => false,
+                _ => gtk::Settings::default().is_some_and(|settings| {
+                    settings.is_gtk_application_prefer_dark_theme()
+                        || settings
+                            .gtk_theme_name()
+                            .is_some_and(|name| name.to_lowercase().contains("dark"))
+                }),
+            };
+            let state = TrayState::current().with_dark(dark);
+            if rendered_state != Some(state) {
+                if let Ok(icons) = tray_icons(state) {
+                    tray.update(move |tray| tray.icons = icons);
+                    rendered_state = Some(state);
+                }
+            }
         }
         glib::ControlFlow::Continue
     });
@@ -295,7 +353,7 @@ mod tests {
 
     #[test]
     fn tray_icons_have_visible_argb_pixels_at_each_size() {
-        let icons = tray_icons().unwrap();
+        let icons = tray_icons(TrayState::current()).unwrap();
         assert_eq!(icons.len(), 3);
         for icon in icons {
             assert_eq!(icon.data.len(), (icon.width * icon.height * 4) as usize);

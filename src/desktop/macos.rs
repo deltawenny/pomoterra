@@ -93,7 +93,8 @@ fn poll() {
                 }
             }
         }
-        let state = slot.as_ref().unwrap();
+        let state = slot.as_mut().unwrap();
+        state.tray.update();
         for action in state.tray.actions() {
             match action {
                 Action::Restore => {

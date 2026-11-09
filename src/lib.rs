@@ -110,6 +110,12 @@ pub fn App() -> impl IntoElement {
     let library = signal(loaded);
     let active = signal(active_id);
     let timer = signal(initial_timer);
+    #[cfg(all(
+        feature = "native",
+        not(feature = "gpui"),
+        any(target_os = "linux", target_os = "windows", target_os = "macos")
+    ))]
+    effect(move || desktop::update_timer(&timer.get()));
     // Observe only rule changes, not each countdown tick, before writing SQLite.
     let saved_rules = signal(timer.get().rules.clone());
     effect(move || {

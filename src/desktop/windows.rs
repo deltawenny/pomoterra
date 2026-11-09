@@ -172,8 +172,13 @@ unsafe extern "system" fn window_proc(
                 return LRESULT(0);
             }
             WM_TIMER if w.0 == TIMER => {
-                let actions = TRAY.with_borrow(|tray| {
-                    tray.as_ref().map(|tray| tray.actions()).unwrap_or_default()
+                let actions = TRAY.with_borrow_mut(|tray| {
+                    tray.as_mut()
+                        .map(|tray| {
+                            tray.update();
+                            tray.actions()
+                        })
+                        .unwrap_or_default()
                 });
                 for action in actions {
                     match action {
