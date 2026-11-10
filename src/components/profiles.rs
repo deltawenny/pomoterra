@@ -44,7 +44,7 @@ pub(crate) fn choose(
     let result = data
         .database
         .as_ref()
-        .ok_or_else(|| crate::i18n::t("Storage unavailable"))
+        .ok_or_else(|| crate::i18n::t("storage_unavailable_147"))
         .and_then(|db| db.select(id));
     if let Err(error) = result {
         library.update(|data| data.error = error);
@@ -76,8 +76,8 @@ pub(crate) fn profile_picker(
             )
         })
         .value(move || Some(vec![active.get().to_string().into()]))
-        .accessibility_label(crate::i18n::optional("Configuration profile"))
-        .placeholder(crate::i18n::optional("Search profiles"))
+        .accessibility_label(crate::i18n::optional("configuration_profile_134"))
+        .placeholder(crate::i18n::optional("search_profiles_136"))
         .on_change(move |value: &Vec<SharedString>| {
             if let Some(id) = value.first().and_then(|v| v.parse().ok()) {
                 choose(timer, library, active, id);
@@ -149,7 +149,7 @@ pub(crate) fn quick_profile_switcher(
                                                 (
                                                     "current",
                                                     if active.get() == id {
-                                                        crate::i18n::t(" (current profile)")
+                                                        crate::i18n::t("current_profile_177")
                                                     } else {
                                                         String::new()
                                                     },
@@ -205,7 +205,7 @@ pub(crate) fn profile_settings(
         }
     });
     view().gap(px(10.0)).mb(px(26.0))
-        .child(text(crate::i18n::tr("Configuration Profile")).text_size(px(12.0)).text_color(rgb(0x333333)))
+        .child(text(crate::i18n::tr("configuration_profile_135")).text_size(px(12.0)).text_color(rgb(0x333333)))
         .child(view().flex_row().items_center().gap(px(4.0))
             .child(view().flex_1().min_w(px(0.0)).child(profile_picker(timer, library, active, move || {
                 editing.set(false);
@@ -213,8 +213,8 @@ pub(crate) fn profile_settings(
             })))
             .child(action("Add profile", Icon::Plus, move || {
                 let data = library.get();
-                let result = data.database.as_ref().ok_or_else(|| crate::i18n::t("Storage unavailable"))
-                    .and_then(|db| db.create_profile(&format!("{} {}", crate::i18n::t("Profile"), data.profiles.iter().map(|p| p.id).max().unwrap_or(0) + 1)));
+                let result = data.database.as_ref().ok_or_else(|| crate::i18n::t("storage_unavailable_147"))
+                    .and_then(|db| db.create_profile(&format!("{} {}", crate::i18n::t("profile_198"), data.profiles.iter().map(|p| p.id).max().unwrap_or(0) + 1)));
                 match result {
                     Ok(profile) => {
                         let id = profile.id;
@@ -233,7 +233,7 @@ pub(crate) fn profile_settings(
             .child(action("Delete profile", Icon::Trash2, move || deleting.set(true))))
         .child(when(move || editing.get(), move || view().flex_row().gap(px(6.0))
             .child(text_input(|| false).flex_1()
-                .label(crate::i18n::tr("Profile name")).value(move || name.get())
+                .label(crate::i18n::tr("profile_name_140")).value(move || name.get())
                 .on_change(move |value: &str| name.set(value.to_owned())))
             .child(action("Save profile name", Icon::Check, move || {
                 library.update(|data| data.edit(active.get(), |p| p.name = name.get()));
@@ -247,8 +247,8 @@ pub(crate) fn profile_settings(
             .border_color(rgb(0xe0b4b4))
             .rounded(px(6.0))
             .bg(rgb(0xfff8f8))
-            .child(text(crate::i18n::tr("Delete this profile?")).text_size(px(12.0)).text_color(rgb(0x6f2222)))
-            .child(text(crate::i18n::tr("Its history will be kept.")).text_size(px(12.0)).text_color(rgb(0x555555)))
+            .child(text(crate::i18n::tr("delete_this_profile_143")).text_size(px(12.0)).text_color(rgb(0x6f2222)))
+            .child(text(crate::i18n::tr("its_history_will_be_kept_144")).text_size(px(12.0)).text_color(rgb(0x555555)))
             .child(view().flex_row().gap(px(8.0))
                 .child(text_button("Confirm delete", move || {
                     let data = library.get();
@@ -268,41 +268,41 @@ pub(crate) fn profile_settings(
                 }))
                 .child(text_button("Cancel delete", move || deleting.set(false))))))
         .child(view().flex_row().items_center().gap(px(8.0))
-            .role(AccessibilityRole::Checkbox).label(crate::i18n::tr("Payable"))
+            .role(AccessibilityRole::Checkbox).label(crate::i18n::tr("payable_148"))
             .on_press(move || library.update(|data| data.edit(active.get(), |p| p.payable = !p.payable)))
             .child(view().w(px(20.0)).h(px(20.0)).border_1().border_color(rgb(BLUE)).rounded(px(3.0))
                 .child(when(move || library.get().profiles.iter().find(|p| p.id == active.get()).is_some_and(|p| p.payable), move || icon(Icon::Check, BLUE, 18.0))))
-            .child(text(crate::i18n::tr("Payable")).text_size(px(13.0))))
+            .child(text(crate::i18n::tr("payable_148")).text_size(px(13.0))))
         .child(when(move || library.get().profiles.iter().find(|p| p.id == active.get()).is_some_and(|p| p.payable), move || {
             view().flex_row().gap(px(8.0)).items_center()
                 .child(text_input(move || parse_rate(&rate.get()).is_none()).flex_1()
-                    .label(crate::i18n::tr("Hourly rate")).placeholder(crate::i18n::tr("0.00 / hour"))
+                    .label(crate::i18n::tr("hourly_rate_149")).placeholder(crate::i18n::tr("0_00_hour_150"))
                     .value(move || rate.get()).on_change(move |value: &str| {
                         rate.set(value.to_owned());
                         if let Some(value) = parse_rate(value) { library.update(|data| data.edit(active.get(), |p| p.rate = value)); }
                     }))
                 .child(view().w(px(88.0)).flex_shrink_0().child(combobox().items(sorted_items(["USD", "EUR", "GBP", "RUB", "JPY", "CAD", "AUD", "CHF", "INR"].into_iter().map(|v| SelectItem::new(v, v))))
                     .value(move || Some(vec![library.get().profiles.iter().find(|p| p.id == active.get()).map(|p| p.currency.clone()).unwrap_or_else(|| "USD".into()).into()]))
-                    .accessibility_label(crate::i18n::optional("Currency"))
-                    .placeholder(crate::i18n::optional("Currency"))
-                    .empty(text(crate::i18n::tr("No matching currencies")).text_size(px(12.0)).text_color(rgb(GREY)).p(px(12.0)))
+                    .accessibility_label(crate::i18n::optional("currency_151"))
+                    .placeholder(crate::i18n::optional("currency_151"))
+                    .empty(text(crate::i18n::tr("no_matching_currencies_152")).text_size(px(12.0)).text_color(rgb(GREY)).p(px(12.0)))
                     .popup_class("min-w-[88px] bg-white border border-[#dddddd] rounded-md p-1 shadow-lg")
                     .on_change(move |value: &Vec<SharedString>| { if let Some(value) = value.first() { library.update(|data| data.edit(active.get(), |p| p.currency = value.to_string())); } })))
-                .child(text(crate::i18n::tr("/ hour")).text_size(px(11.0)))
+                .child(text(crate::i18n::tr("hour_153")).text_size(px(11.0)))
         }))
-        .child(text(crate::i18n::tr("Profile color")).text_size(px(12.0)))
+        .child(text(crate::i18n::tr("profile_color_154")).text_size(px(12.0)))
         .child(view().flex_row().gap(px(8.0)).items_center()
             .children(["#0083c9", "#008c69", "#a855f7", "#e05274", "#e5a100", "#e76f35"].into_iter().map(move |value| {
                 view().w(px(22.0)).h(px(22.0)).rounded(px(11.0)).bg(rgb(color(value).unwrap())).border_2()
                     .border_color(move || rgb(if library.get().profiles.iter().find(|p| p.id == active.get()).is_some_and(|p| p.color == value) { 0x222222 } else { 0xffffff }))
-                    .role(AccessibilityRole::Button).label(move || crate::i18n::message("Use color {value}", &[("value", value.into())]))
+                    .role(AccessibilityRole::Button).label(move || crate::i18n::message("use_color_value_178", &[("value", value.into())]))
                     .on_press(move || {
                         library.update(|data| data.edit(active.get(), |p| p.color = value.into()));
                         color_text.set(value.into());
                     })
             }))
             .child(text_input(move || color(&color_text.get()).is_none()).flex_1()
-                .label(crate::i18n::tr("Profile color hex")).placeholder(crate::i18n::tr("#0083c9"))
+                .label(crate::i18n::tr("profile_color_hex_155")).placeholder(crate::i18n::tr("#0083c9"))
                 .value(move || color_text.get()).on_change(move |value: &str| {
                     color_text.set(value.to_owned());
                     if color(value).is_some() { library.update(|data| data.edit(active.get(), |p| p.color = value.to_owned())); }

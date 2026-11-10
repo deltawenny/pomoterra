@@ -33,7 +33,7 @@ pub(crate) fn settings_tab(
                 .items_center()
                 .justify_between()
                 .child(
-                    text(crate::i18n::tr("SETTINGS"))
+                    text(crate::i18n::tr("settings_123"))
                         .text_size(px(14.0))
                         .text_color(rgb(0x111111)),
                 )
@@ -107,7 +107,7 @@ fn card() -> View {
 fn language_setting(library: Signal<Library>) -> View {
     card()
         .child(
-            text(crate::i18n::tr("Language"))
+            text(crate::i18n::tr("language_125"))
                 .flex_1()
                 .text_size(px(13.0)),
         )
@@ -115,15 +115,14 @@ fn language_setting(library: Signal<Library>) -> View {
             view().w(px(150.0)).flex_shrink_0().child(
                 combobox()
                     .items(move || {
-                        sorted_items(
-                            ["English", "Русский", "Español"]
-                                .into_iter()
-                                .map(|name| SelectItem::new(name, name)),
-                        )
+                        sorted_items(crate::i18n::Language::ALL.into_iter().map(|language| {
+                            let name = language.preference();
+                            SelectItem::new(name, name)
+                        }))
                     })
                     .value(move || Some(vec![library.get().settings.language.clone().into()]))
-                    .accessibility_label(crate::i18n::optional("Language"))
-                    .placeholder(crate::i18n::optional("Language"))
+                    .accessibility_label(crate::i18n::optional("language_125"))
+                    .placeholder(crate::i18n::optional("language_125"))
                     .on_change(move |value: &Vec<SharedString>| {
                         if let Some(value) = value.first() {
                             library.update(|data| {
@@ -256,8 +255,8 @@ fn quick_profiles(
                             .collect(),
                     )
                 })
-                .accessibility_label(crate::i18n::optional("Quick switch profiles"))
-                .placeholder(crate::i18n::optional("Select profiles"))
+                .accessibility_label(crate::i18n::optional("quick_switch_profiles_131"))
+                .placeholder(crate::i18n::optional("select_profiles_132"))
                 .on_change(move |value: &Vec<SharedString>| {
                     let ids = value
                         .iter()

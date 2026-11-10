@@ -55,9 +55,9 @@ fn session_counter(timer: Signal<TimerState>) -> View {
             })
             .text_size(px(14.0)),
         )
-        .child(text(crate::i18n::tr("Sessions")).text_size(move || {
+        .child(text(crate::i18n::tr("sessions_106")).text_size(move || {
             px(
-                if crate::i18n::language() == crate::i18n::Language::Spanish {
+                if crate::i18n::language() != crate::i18n::Language::English {
                     12.0
                 } else {
                     14.0
@@ -87,9 +87,9 @@ fn play_pause_button(timer: Signal<TimerState>) -> View {
         .role(AccessibilityRole::Button)
         .label(move || {
             if timer.get().running {
-                crate::i18n::t("Pause timer")
+                crate::i18n::t("pause_timer_161")
             } else {
-                crate::i18n::t("Start timer")
+                crate::i18n::t("start_timer_162")
             }
         })
         .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))
@@ -119,9 +119,9 @@ fn announcement_toggle(timer: Signal<TimerState>, announcements: Signal<bool>) -
         .role(AccessibilityRole::Button)
         .label(move || {
             if announcements.get() {
-                crate::i18n::t("Mute announcements")
+                crate::i18n::t("mute_announcements_163")
             } else {
-                crate::i18n::t("Enable announcements")
+                crate::i18n::t("enable_announcements_164")
             }
         })
         .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))

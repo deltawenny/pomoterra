@@ -45,14 +45,14 @@ pub(crate) fn config_tab(
                 .child(
                     view()
                         .role(AccessibilityRole::Button)
-                        .label(crate::i18n::tr("Restore Default"))
+                        .label(crate::i18n::tr("restore_default_171"))
                         .on_press(move || {
                             timer.update(|state| {
                                 state.configure(|rules| *rules = TimerRules::default())
                             })
                         })
                         .child(
-                            text(crate::i18n::tr("Restore Default"))
+                            text(crate::i18n::tr("restore_default_171"))
                                 .text_size(px(13.0))
                                 .text_color(rgb(GREY)),
                         ),

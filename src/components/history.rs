@@ -50,7 +50,7 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
     let displayed_sessions = move || preview.get().unwrap_or_else(|| library.get().sessions);
     scroll().flex_1().child(view().p(px(16.0)).gap(px(16.0))
         .child(view().flex_row().justify_between().items_center()
-            .child(text(crate::i18n::tr("Focus history")).text_size(px(17.0)).text_color(rgb(0x222222)))
+            .child(text(crate::i18n::tr("focus_history_179")).text_size(px(17.0)).text_color(rgb(0x222222)))
             .child(super::profiles::text_button("Reverse date order", move || oldest.update(|v| *v = !*v))))
         .child(view().gap(px(6.0))
             .child(dynamic(move || {
@@ -72,7 +72,7 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
             ].into_iter().map(move |(value, title)| {
                 view().flex_1().py(px(7.0)).items_center().rounded(px(4.0))
                     .bg(move || rgb(if period.get() == value { 0xe7f4fc } else { 0xf6f6f6 }))
-                    .role(AccessibilityRole::Button).label(move || crate::i18n::message("History: {title}", &[("title", crate::i18n::t(title))]))
+                    .role(AccessibilityRole::Button).label(move || crate::i18n::message("history_title_188", &[("title", crate::i18n::t(title))]))
                     .on_press(move || period.set(value))
                     .child(text(crate::i18n::tr(title)).text_size(px(11.0)).text_color(rgb(BLUE)))
             })))
@@ -83,20 +83,20 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
                     if preview.get().is_none() {
                         names.extend(data.profiles.iter().map(|p| (p.id, p.name.clone())));
                     }
-                    std::iter::once(SelectItem::new("0", crate::i18n::t("All profiles")))
+                    std::iter::once(SelectItem::new("0", crate::i18n::t("all_profiles_189")))
                         .chain(sorted_items(names.into_iter().map(|(id, name)| SelectItem::new(id.to_string(), name)))).collect::<Vec<_>>()
                 })
                 .value(move || Some(vec![profile.get().to_string().into()]))
-                .accessibility_label(crate::i18n::optional("History profile"))
-                .placeholder(crate::i18n::optional("Search profiles"))
+                .accessibility_label(crate::i18n::optional("history_profile_190"))
+                .placeholder(crate::i18n::optional("search_profiles_136"))
                 .on_change(move |value: &Vec<SharedString>| { if let Some(id) = value.first().and_then(|v| v.parse().ok()) { profile.set(id); } }))
             .child(view().flex_row().gap(px(6.0))
                 .child(super::input::text_input(move || {
                     !from_date.get().trim().is_empty() && parse_date(&from_date.get()).is_none()
-                }).flex_1().label(crate::i18n::tr("From date")).placeholder(crate::i18n::tr("YYYY-MM-DD")).value(move || from_date.get()).on_change(move |value: &str| from_date.set(value.to_owned())))
+                }).flex_1().label(crate::i18n::tr("from_date_191")).placeholder(crate::i18n::tr("yyyy_mm_dd_193")).value(move || from_date.get()).on_change(move |value: &str| from_date.set(value.to_owned())))
                 .child(super::input::text_input(move || {
                     !to_date.get().trim().is_empty() && parse_date(&to_date.get()).is_none()
-                }).flex_1().label(crate::i18n::tr("To date")).placeholder(crate::i18n::tr("YYYY-MM-DD")).value(move || to_date.get()).on_change(move |value: &str| to_date.set(value.to_owned())))))
+                }).flex_1().label(crate::i18n::tr("to_date_192")).placeholder(crate::i18n::tr("yyyy_mm_dd_193")).value(move || to_date.get()).on_change(move |value: &str| to_date.set(value.to_owned())))))
         .child(dynamic(move || {
             let today = Local::now().date_naive();
             let start = period.get().start(today);
@@ -131,7 +131,7 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
                 .child(text(crate::i18n::message("{count} sessions · {hours}h {minutes}m", &[("count", sessions.len().to_string()), ("hours", (seconds / 3600).to_string()), ("minutes", (seconds % 3600 / 60).to_string())])).text_size(px(14.0)).text_color(rgb(0x333333)))
                 .children(earnings.into_iter().map(|(currency, amount)| text(crate::i18n::message("{amount} {currency} earned", &[("amount", money(amount)), ("currency", currency)])).text_size(px(12.0)).text_color(rgb(0x008c69))))
                 .child(profile_chart(&sessions))
-                .child(text(if oldest.get() { crate::i18n::t("SESSIONS · OLDEST FIRST") } else { crate::i18n::t("SESSIONS · NEWEST FIRST") }).text_size(px(11.0)))
+                .child(text(if oldest.get() { crate::i18n::t("sessions_oldest_first_194") } else { crate::i18n::t("sessions_newest_first") }).text_size(px(11.0)))
                 .child(when(move || empty, || text(crate::i18n::tr("No completed focus sessions in this period. Finish a focus session to start your history.")).text_size(px(13.0)).text_color(rgb(GREY))))
                 .children(sessions.into_iter().map(session_row))
         })))
@@ -264,7 +264,7 @@ fn profile_chart(sessions: &[Session]) -> View {
         .p(px(12.0))
         .bg(rgb(0xfffbf1))
         .rounded(px(6.0))
-        .child(text(crate::i18n::tr("FOCUS TIME BY PROFILE")).text_size(px(10.0)))
+        .child(text(crate::i18n::tr("focus_time_by_profile")).text_size(px(10.0)))
         .children(totals.into_values().map(move |(name, hex, seconds)| {
             view()
                 .gap(px(4.0))
@@ -337,7 +337,7 @@ fn session_row(session: Session) -> View {
         )
         .child(
             text(if session.note.is_empty() {
-                crate::i18n::t("Focus session")
+                crate::i18n::t("focus_session_197")
             } else {
                 session.note.clone()
             })

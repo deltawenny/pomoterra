@@ -77,7 +77,7 @@ fn tab(
             text(crate::i18n::tr(label))
                 .text_size(move || {
                     px(
-                        if crate::i18n::language() == crate::i18n::Language::Spanish {
+                        if crate::i18n::language() != crate::i18n::Language::English {
                             11.0
                         } else {
                             13.0

@@ -190,6 +190,25 @@ mod tests {
     }
 
     #[test]
+    fn russian_snapshot_translates_status_and_actions() {
+        let mut library = library();
+        library.settings.language = "Русский".into();
+        let mut timer = TimerState::default();
+        let menu = TrayMenu::snapshot(&timer, &library, 0);
+        assert_eq!(menu.profile, "Профиль: —");
+        assert_eq!(menu.phase, "Работа · Пауза");
+        assert_eq!(menu.playback_label(), "Запустить");
+        assert_eq!(menu.translate("Quit"), "Выйти");
+        assert_eq!(menu.translate("Switch profile"), "Сменить профиль");
+        timer.skip();
+        timer.toggle(std::time::Instant::now());
+        let menu = TrayMenu::snapshot(&timer, &library, 0);
+        assert_eq!(menu.phase, "Перерыв · Идёт");
+        assert_eq!(menu.playback_label(), "Остановить");
+        assert_eq!(menu.time, "05:00 / 05:00");
+    }
+
+    #[test]
     fn formats_remaining_and_actual_phase_duration() {
         let mut timer = TimerState::default();
         timer.remaining = 24 * 60 + 12;
