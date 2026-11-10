@@ -12,8 +12,18 @@ breaks last 5 minutes, with a 15-minute break after every fourth focus session.
 The next session waits for you to press Start. Reset restarts the current phase.
 
 Click the three dots to edit or save a session note. The speaker control toggles
-screen-reader completion announcements (not an audio alarm). Notes and timer
-countdown state are kept in memory for the current app run. Completed focus sessions save their notes to SQLite.
+an audible, two-note completion chime and screen-reader announcements for both
+focus sessions and breaks. Unmuting plays a preview; Reset and Skip do not ring.
+The chime works independently of system notification banners, including in GPUI
+builds. Playback uses Rodio on the default audio output device, with no external
+players or temporary sound files. The built-in chime is generated in memory and
+decoded through the same pipeline that can later support user-selected sounds.
+WAV, MP3, Ogg Vorbis, and FLAC decoding are enabled; choosing and saving custom
+sounds is not implemented yet. Linux builds require ALSA development files
+(`libasound2-dev` on Ubuntu/Debian, `alsa-lib-devel` on Fedora), and runtime
+playback requires a working default audio device. No sound-file download is needed.
+The speaker setting, notes, and timer countdown state are kept in memory for the
+current app run. Completed focus sessions save their notes to SQLite.
 
 ## Background operation and tray
 

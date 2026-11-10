@@ -1,6 +1,7 @@
 //! A compact Pomodoro timer with configurable rules and scheduled breaks.
 rust_i18n::i18n!("locales", fallback = "en");
 
+mod audio;
 mod components;
 mod i18n;
 mod icons;
@@ -189,6 +190,7 @@ pub fn App() -> impl IntoElement {
             if let Some(phase) = finished_phase {
                 let settings = library.get().settings;
                 if announcements.get() {
+                    audio::play_completion();
                     announce_for_accessibility("Session complete. Your next session is ready.");
                 }
                 let show = match phase {

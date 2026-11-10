@@ -127,7 +127,13 @@ fn announcement_toggle(timer: Signal<TimerState>, announcements: Signal<bool>) -
         .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))
         .on_mouse_leave(move |_: &MouseEvent| hovered.set(false))
         .active(|s| s.opacity(0.5))
-        .on_press(move || announcements.update(|value| *value = !*value))
+        .on_press(move || {
+            let enabled = !announcements.get();
+            announcements.set(enabled);
+            if enabled {
+                crate::audio::play_completion();
+            }
+        })
         .child(dynamic(move || {
             icon(
                 if announcements.get() {
