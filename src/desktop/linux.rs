@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use super::tray_image::TrayState;
+use super::{tray_image::TrayState, tray_menu::TrayMenu};
 use ksni::blocking::TrayMethods;
 use nsh_platform_linux::gtk4::{self as gtk, glib, prelude::*};
 
@@ -24,6 +24,7 @@ enum Event {
 struct Tray {
     events: Sender<Event>,
     icons: Vec<ksni::Icon>,
+    menu: TrayMenu,
 }
 
 impl ksni::Tray for Tray {
@@ -44,8 +45,64 @@ impl ksni::Tray for Tray {
     }
 
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
-        use ksni::menu::StandardItem;
-        vec![
+        use ksni::menu::{CheckmarkItem, StandardItem, SubMenu};
+        let mut profiles: Vec<ksni::MenuItem<Self>> = self
+            .menu
+            .profiles
+            .iter()
+            .map(|profile| {
+                let id = profile.id;
+                CheckmarkItem {
+                    label: profile.name.replace('_', "__"),
+                    checked: profile.selected,
+                    activate: Box::new(move |_: &mut Self| super::tray_menu::request_profile(id)),
+                    ..Default::default()
+                }
+                .into()
+            })
+            .collect();
+        if profiles.is_empty() {
+            profiles.push(
+                StandardItem {
+                    label: "Choose quick profiles in Settings".into(),
+                    enabled: false,
+                    ..Default::default()
+                }
+                .into(),
+            );
+        }
+        let mut menu: Vec<ksni::MenuItem<Self>> =
+            [&self.menu.profile, &self.menu.phase, &self.menu.time]
+                .into_iter()
+                .map(|label| {
+                    StandardItem {
+                        label: label.replace('_', "__"),
+                        enabled: false,
+                        ..Default::default()
+                    }
+                    .into()
+                })
+                .collect();
+        menu.push(ksni::MenuItem::Separator);
+        let running = !self.menu.running;
+        menu.push(
+            StandardItem {
+                label: self.menu.playback_label().into(),
+                activate: Box::new(move |_: &mut Self| super::tray_menu::request_playback(running)),
+                ..Default::default()
+            }
+            .into(),
+        );
+        menu.push(
+            SubMenu {
+                label: "Switch profile".into(),
+                submenu: profiles,
+                ..Default::default()
+            }
+            .into(),
+        );
+        menu.push(ksni::MenuItem::Separator);
+        menu.extend(vec![
             StandardItem {
                 label: "Restore the app".into(),
                 activate: Box::new(|tray: &mut Self| {
@@ -62,7 +119,8 @@ impl ksni::Tray for Tray {
                 ..Default::default()
             }
             .into(),
-        ]
+        ]);
+        menu
     }
 
     fn watcher_online(&self) {
@@ -220,6 +278,7 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
             Tray {
                 events: events.clone(),
                 icons,
+                menu: TrayMenu::current(),
             }
             .spawn()
             .map_err(|error| error.to_string())
@@ -230,6 +289,7 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
     let weak_window = window.downgrade();
     let mut handle: Option<ksni::blocking::Handle<Tray>> = None;
     let mut rendered_state = None;
+    let mut rendered_menu = None;
     glib::timeout_add_local(Duration::from_millis(100), move || {
         let Some(window) = weak_window.upgrade() else {
             if let Some(handle) = handle.take() {
@@ -270,6 +330,11 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
             return glib::ControlFlow::Break;
         }
         if let Some(tray) = &handle {
+            let menu = TrayMenu::current();
+            if rendered_menu.as_ref() != Some(&menu) {
+                rendered_menu = Some(menu.clone());
+                tray.update(move |tray| tray.menu = menu);
+            }
             let dark = match appearance.load(std::sync::atomic::Ordering::Relaxed) {
                 2 => true,
                 1 => false,
@@ -371,12 +436,42 @@ mod tests {
         let mut tray = Tray {
             events,
             icons: vec![],
+            menu: TrayMenu::default(),
         };
         tray.activate(0, 0);
         assert!(matches!(receiver.recv().unwrap(), Event::Restore));
         let menu = tray.menu();
-        assert_eq!(menu.len(), 2);
-        for (item, label) in menu.into_iter().zip(["Restore the app", "Quit"]) {
+        assert_eq!(menu.len(), 9);
+        let ksni::MenuItem::Standard(playback) = &menu[4] else {
+            panic!("expected playback action");
+        };
+        assert_eq!(playback.label, "Play");
+        assert!(playback.enabled);
+        (playback.activate)(&mut tray);
+        assert_eq!(super::super::tray_menu::take_playback_request(), Some(true));
+        tray.menu.running = true;
+        let running_menu = tray.menu();
+        let ksni::MenuItem::Standard(playback) = &running_menu[4] else {
+            panic!("expected playback action");
+        };
+        assert_eq!(playback.label, "Stop");
+        (playback.activate)(&mut tray);
+        assert_eq!(
+            super::super::tray_menu::take_playback_request(),
+            Some(false)
+        );
+        for item in &menu[..3] {
+            let ksni::MenuItem::Standard(item) = item else {
+                panic!("expected status item");
+            };
+            assert!(!item.enabled);
+        }
+        let ksni::MenuItem::SubMenu(profiles) = &menu[5] else {
+            panic!("expected profile submenu");
+        };
+        assert_eq!(profiles.label, "Switch profile");
+        assert_eq!(profiles.submenu.len(), 1);
+        for (item, label) in menu.into_iter().skip(7).zip(["Restore the app", "Quit"]) {
             let ksni::MenuItem::Standard(item) = item else {
                 panic!("expected a standard menu item");
             };

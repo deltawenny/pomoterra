@@ -1,8 +1,11 @@
 //! Native tray/menu objects must be created and retained on the UI thread.
-use super::tray_image::{TrayState, icon_rgba};
+use super::{
+    tray_image::{TrayState, icon_rgba},
+    tray_menu::TrayMenu,
+};
 use tray_icon::{
     TrayIcon, TrayIconBuilder,
-    menu::{Menu, MenuEvent, MenuItem},
+    menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
 };
 
 #[cfg(target_os = "windows")]
@@ -52,6 +55,13 @@ pub(super) struct NativeTray {
     state: TrayState,
     restore: MenuItem,
     quit: MenuItem,
+    playback: MenuItem,
+    profile: MenuItem,
+    phase: MenuItem,
+    time: MenuItem,
+    profiles: Submenu,
+    choices: Vec<(i64, CheckMenuItem)>,
+    rendered_menu: TrayMenu,
 }
 
 pub(super) enum Action {
@@ -64,7 +74,24 @@ impl NativeTray {
         let menu = Menu::new();
         let restore = MenuItem::new("Restore the app", true, None);
         let quit = MenuItem::new("Quit", true, None);
-        menu.append_items(&[&restore, &quit])?;
+        let rendered_menu = TrayMenu::current();
+        let playback = MenuItem::new(rendered_menu.playback_label(), true, None);
+        let profile = MenuItem::new(rendered_menu.profile.replace('&', "&&"), false, None);
+        let phase = MenuItem::new(&rendered_menu.phase, false, None);
+        let time = MenuItem::new(&rendered_menu.time, false, None);
+        let profiles = Submenu::new("Switch profile", true);
+        let choices = Self::populate_profiles(&profiles, &rendered_menu)?;
+        menu.append_items(&[
+            &profile,
+            &phase,
+            &time,
+            &PredefinedMenuItem::separator(),
+            &playback,
+            &profiles,
+            &PredefinedMenuItem::separator(),
+            &restore,
+            &quit,
+        ])?;
         let state = TrayState::current().with_dark(system_dark());
         let icon = tray_icon::Icon::from_rgba(icon_rgba(32, state)?, 32, 32)?;
         let icon = TrayIconBuilder::new()
@@ -78,10 +105,60 @@ impl NativeTray {
             state,
             restore,
             quit,
+            playback,
+            profile,
+            phase,
+            time,
+            profiles,
+            choices,
+            rendered_menu,
         })
     }
 
+    fn populate_profiles(
+        submenu: &Submenu,
+        menu: &TrayMenu,
+    ) -> Result<Vec<(i64, CheckMenuItem)>, Box<dyn std::error::Error>> {
+        while submenu.remove_at(0).is_some() {}
+        let mut choices = Vec::new();
+        for profile in &menu.profiles {
+            let item = CheckMenuItem::new(
+                profile.name.replace('&', "&&"),
+                true,
+                profile.selected,
+                None,
+            );
+            submenu.append(&item)?;
+            choices.push((profile.id, item));
+        }
+        if choices.is_empty() {
+            submenu.append(&MenuItem::new(
+                "Choose quick profiles in Settings",
+                false,
+                None,
+            ))?;
+        }
+        Ok(choices)
+    }
+
     pub(super) fn update(&mut self) {
+        let menu = TrayMenu::current();
+        if menu != self.rendered_menu {
+            self.profile.set_text(menu.profile.replace('&', "&&"));
+            self.phase.set_text(&menu.phase);
+            self.time.set_text(&menu.time);
+            self.playback.set_text(menu.playback_label());
+            if menu.profiles != self.rendered_menu.profiles {
+                match Self::populate_profiles(&self.profiles, &menu) {
+                    Ok(choices) => self.choices = choices,
+                    Err(error) => {
+                        eprintln!("Pomoterra tray profile update failed: {error}");
+                        return;
+                    }
+                }
+            }
+            self.rendered_menu = menu;
+        }
         let state = TrayState::current().with_dark(system_dark());
         if state == self.state {
             return;
@@ -108,9 +185,26 @@ impl NativeTray {
             .filter_map(|event| {
                 if event.id == *self.restore.id() {
                     Some(Action::Restore)
+                } else if event.id == *self.playback.id() {
+                    super::tray_menu::request_playback(!self.rendered_menu.running);
+                    None
                 } else if event.id == *self.quit.id() {
                     Some(Action::Quit)
                 } else {
+                    if let Some((id, _)) =
+                        self.choices.iter().find(|(_, item)| event.id == *item.id())
+                    {
+                        super::tray_menu::request_profile(*id);
+                        // Native check items toggle eagerly; the app snapshot is authoritative.
+                        for (id, item) in &self.choices {
+                            item.set_checked(
+                                self.rendered_menu
+                                    .profiles
+                                    .iter()
+                                    .any(|p| p.id == *id && p.selected),
+                            );
+                        }
+                    }
                     None
                 }
             })

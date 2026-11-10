@@ -121,7 +121,7 @@ pub fn App() -> impl IntoElement {
         not(feature = "gpui"),
         any(target_os = "linux", target_os = "windows", target_os = "macos")
     ))]
-    effect(move || desktop::update_timer(&timer.get()));
+    effect(move || desktop::update_timer(&timer.get(), &library.get(), active.get()));
     // Observe only rule changes, not each countdown tick, before writing SQLite.
     let saved_rules = signal(timer.get().rules.clone());
     effect(move || {
@@ -144,6 +144,27 @@ pub fn App() -> impl IntoElement {
     let selected = signal(Tab::Timer);
 
     set_interval(Duration::from_millis(200), move || {
+        #[cfg(all(
+            feature = "native",
+            not(feature = "gpui"),
+            any(target_os = "linux", target_os = "windows", target_os = "macos")
+        ))]
+        if let Some(id) = desktop::take_profile_request() {
+            // Ignore stale menu entries and selecting the already-active profile.
+            if id != active.get() && library.get().settings.quick_profiles.contains(&id) {
+                choose_profile(timer, library, active, id);
+            }
+        }
+        #[cfg(all(
+            feature = "native",
+            not(feature = "gpui"),
+            any(target_os = "linux", target_os = "windows", target_os = "macos")
+        ))]
+        if let Some(running) = desktop::take_playback_request() {
+            if timer.get().running != running {
+                timer.update(|state| state.toggle(Instant::now()));
+            }
+        }
         if timer.get().running {
             let mut finished = false;
             let mut finished_phase = None;

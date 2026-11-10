@@ -216,7 +216,7 @@ fn quick_profiles(
                 .text_color(rgb(0x222222)),
         )
         .child(
-            text("Choose profiles to show as one-tap shortcuts on the Timer tab.")
+            text("Choose profiles for quick switching on the Timer tab and in the tray menu.")
                 .text_size(px(11.0))
                 .text_color(rgb(GREY)),
         )

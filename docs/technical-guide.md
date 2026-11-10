@@ -28,8 +28,20 @@ stopping the app. An active timer and scheduled breaks continue working while
 hidden; restoring the window preserves the current timer, settings, and note.
 The next session still waits for Start, just as it does with the window visible.
 
-The tray uses a blue Lucide timer icon with **Restore the app** and **Quit**
-actions. On Linux, clicking the icon also restores the window. On Windows and
+The tray uses a theme-aware countdown icon and shows the selected profile,
+current Focus/Break phase, running/paused state, and remaining / total phase time
+(for example, **24:12 / 25:00**). Its **Switch profile** submenu lists the quick
+profiles chosen under **Settings → Quick switch configuration profiles**, with
+the active profile checked. Switching uses the same behavior as the Timer tab:
+it saves the old profile's rules and starts a fresh, paused focus cycle for the
+new profile. Selecting the already-active profile leaves the timer unchanged.
+If no shortcuts are selected, the submenu points to Settings.
+
+The menu also includes a **Play / Stop** action: Play starts or resumes the
+current countdown, while Stop pauses it without resetting the remaining time.
+The label follows the timer state, including changes made in the app window.
+**Restore the app** and **Quit** actions remain available.
+On Linux, clicking the icon also restores the window. On Windows and
 macOS, clicking opens its menu. **Quit** exits completely; Linux also supports
 Ctrl+Q and macOS retains its normal Cmd+Q application shortcut. On Linux,
 Ctrl+W hides the window; Windows Alt+F4 and macOS's close button do the same.

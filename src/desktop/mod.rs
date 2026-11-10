@@ -46,11 +46,25 @@ mod macos;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 mod native_tray;
 mod tray_image;
+mod tray_menu;
+
+pub(crate) fn take_playback_request() -> Option<bool> {
+    tray_menu::take_playback_request()
+}
+
+pub(crate) fn take_profile_request() -> Option<i64> {
+    tray_menu::take_profile_request()
+}
 #[cfg(target_os = "windows")]
 mod windows;
 
-pub(crate) fn update_timer(timer: &crate::store::TimerState) {
+pub(crate) fn update_timer(
+    timer: &crate::store::TimerState,
+    library: &crate::persistence::Library,
+    active: i64,
+) {
     tray_image::publish(timer);
+    tray_menu::publish(timer, library, active);
 }
 
 #[cfg(target_os = "linux")]
