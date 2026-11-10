@@ -13,8 +13,8 @@ mod desktop;
 
 use chrono::{Datelike, Local, Timelike};
 use components::{
-    GREY, Tab, config_tab, history_tab, profile_picker, session_note, tab_header, timer_controls,
-    timer_display,
+    GREY, Tab, choose_profile, config_tab, dynamic_text_button, history_tab, profile_picker,
+    session_note, settings_tab, tab_header, timer_controls, timer_display,
 };
 use nsh_core::prelude::*;
 use persistence::Library;
@@ -115,6 +115,12 @@ pub fn App() -> impl IntoElement {
         not(feature = "gpui"),
         any(target_os = "linux", target_os = "windows", target_os = "macos")
     ))]
+    effect(move || desktop::update_settings(&library.get().settings));
+    #[cfg(all(
+        feature = "native",
+        not(feature = "gpui"),
+        any(target_os = "linux", target_os = "windows", target_os = "macos")
+    ))]
     effect(move || desktop::update_timer(&timer.get()));
     // Observe only rule changes, not each countdown tick, before writing SQLite.
     let saved_rules = signal(timer.get().rules.clone());
@@ -140,9 +146,14 @@ pub fn App() -> impl IntoElement {
     set_interval(Duration::from_millis(200), move || {
         if timer.get().running {
             let mut finished = false;
+            let mut finished_phase = None;
             timer.update(|state| {
                 let now = Instant::now();
+                let phase = state.phase;
                 finished = state.tick(now);
+                if finished {
+                    finished_phase = Some(phase);
+                }
                 let local = Local::now();
                 state.check_special_break(
                     local.date_naive().num_days_from_ce(),
@@ -150,8 +161,35 @@ pub fn App() -> impl IntoElement {
                     now,
                 );
             });
-            if finished && announcements.get() {
-                announce_for_accessibility("Session complete. Your next session is ready.");
+            if let Some(phase) = finished_phase {
+                let settings = library.get().settings;
+                if announcements.get() {
+                    announce_for_accessibility("Session complete. Your next session is ready.");
+                }
+                let show = match phase {
+                    store::Phase::Focus => settings.show_after_focus,
+                    store::Phase::Break => settings.show_after_break,
+                };
+                #[cfg(all(
+                    feature = "native",
+                    not(feature = "gpui"),
+                    any(target_os = "linux", target_os = "windows", target_os = "macos")
+                ))]
+                {
+                    if show {
+                        desktop::request_show();
+                    }
+                    if settings.system_notifications {
+                        desktop::notify_completion(phase);
+                    }
+                }
+                let continue_next = match phase {
+                    store::Phase::Focus => settings.continue_after_focus,
+                    store::Phase::Break => settings.continue_after_break,
+                };
+                if continue_next {
+                    timer.update(|state| state.toggle(Instant::now()));
+                }
             }
         }
         // Also catches completion discovered by pause and retries failed writes.
@@ -179,6 +217,17 @@ pub fn App() -> impl IntoElement {
         .child(
             view()
                 .flex_1()
+                .style_when(move || selected.get() != Tab::Settings, |s| s.hidden())
+                .child(nsh_core::element::scroll().flex_1().child(settings_tab(
+                    timer,
+                    library,
+                    active,
+                    announcements,
+                ))),
+        )
+        .child(
+            view()
+                .flex_1()
                 .style_when(move || selected.get() != Tab::History, |s| s.hidden())
                 .child(history_tab(library)),
         )
@@ -203,6 +252,19 @@ pub fn App() -> impl IntoElement {
                         .flex_shrink_0()
                         .child(profile_picker(timer, library, active, || {})),
                 )
+                .child(nsh_core::element::dynamic(move || {
+                    let ids = library.get().settings.quick_profiles.clone();
+                    let mut row = view().px(px(16.0)).pb(px(4.0)).flex_row().gap(px(5.0));
+                    for id in ids {
+                        if let Some(profile) = library.get().profiles.iter().find(|p| p.id == id) {
+                            let name = profile.name.clone();
+                            row = row.child(dynamic_text_button(name, move || {
+                                choose_profile(timer, library, active, id);
+                            }));
+                        }
+                    }
+                    row
+                }))
                 .child(timer_display(timer))
                 .child(
                     view()

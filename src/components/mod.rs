@@ -7,14 +7,16 @@ mod history;
 mod input;
 mod profiles;
 mod session_note;
+mod settings;
 mod timer_display;
 
 pub(crate) use config::config_tab;
 pub(crate) use controls::timer_controls;
 pub(crate) use header::{Tab, tab_header};
 pub(crate) use history::history_tab;
-pub(crate) use profiles::profile_picker;
+pub(crate) use profiles::{choose as choose_profile, dynamic_text_button, profile_picker};
 pub(crate) use session_note::session_note;
+pub(crate) use settings::settings_tab;
 pub(crate) use timer_display::timer_display;
 
 const BLUE: u32 = 0x0083c9;

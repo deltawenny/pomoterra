@@ -6,6 +6,7 @@ use crate::store::TimerState;
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum Tab {
+    Settings,
     Config,
     Timer,
     History,
@@ -18,10 +19,23 @@ pub(crate) fn tab_header(selected: Signal<Tab>, timer: Signal<TimerState>) -> Vi
         .flex_row()
         .border_b_1()
         .border_color(rgb(0xeeeeee))
-        .justify_center()
-        .child(tab(selected, timer, Tab::Config, "Config", Icon::Clock))
-        .child(tab(selected, timer, Tab::Timer, "Timer", Icon::Timer))
-        .child(tab(selected, timer, Tab::History, "History", Icon::History))
+        .child(
+            view()
+                .flex_1()
+                .h_full()
+                .flex_row()
+                .justify_center()
+                .child(tab(selected, timer, Tab::Config, "Config", Icon::Clock))
+                .child(tab(selected, timer, Tab::Timer, "Timer", Icon::Timer))
+                .child(tab(selected, timer, Tab::History, "History", Icon::History))
+                .child(tab(
+                    selected,
+                    timer,
+                    Tab::Settings,
+                    "Settings",
+                    Icon::Settings,
+                )),
+        )
 }
 
 fn tab(
@@ -42,6 +56,7 @@ fn tab(
     };
     view()
         .w(px(85.0))
+        .flex_shrink_0()
         .h_full()
         .items_center()
         .justify_center()

@@ -209,9 +209,13 @@ pub(crate) fn profile_settings(
 }
 
 pub(crate) fn text_button(label: &'static str, run: impl Fn() + 'static) -> View {
+    dynamic_text_button(label.to_owned(), run)
+}
+
+pub(crate) fn dynamic_text_button(label: String, run: impl Fn() + 'static) -> View {
     view()
         .role(AccessibilityRole::Button)
-        .label(label)
+        .label(label.clone())
         .on_press(run)
         .px(px(8.0))
         .py(px(5.0))

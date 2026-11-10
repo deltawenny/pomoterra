@@ -158,7 +158,7 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
     let available = Rc::new(Cell::new(false));
     let can_hide = available.clone();
     window.connect_close_request(move |window| {
-        if can_hide.get() {
+        if can_hide.get() && super::close_to_tray() {
             window.set_visible(false);
             glib::Propagation::Stop
         } else {
@@ -237,6 +237,9 @@ pub(crate) fn install(window: &gtk::ApplicationWindow) {
             }
             return glib::ControlFlow::Break;
         };
+        if super::take_show_request() {
+            window.present();
+        }
         for event in receiver.try_iter() {
             match event {
                 Event::Ready(Ok(tray)) => {

@@ -167,11 +167,18 @@ unsafe extern "system" fn window_proc(
                 }
                 return result;
             }
-            WM_CLOSE if TRAY.with(|tray| tray.try_borrow().is_ok_and(|tray| tray.is_some())) => {
+            WM_CLOSE
+                if super::close_to_tray()
+                    && TRAY.with(|tray| tray.try_borrow().is_ok_and(|tray| tray.is_some())) =>
+            {
                 let _ = ShowWindow(hwnd, SW_HIDE);
                 return LRESULT(0);
             }
             WM_TIMER if w.0 == TIMER => {
+                if super::take_show_request() {
+                    let _ = ShowWindow(hwnd, SW_RESTORE);
+                    let _ = SetForegroundWindow(hwnd);
+                }
                 let actions = TRAY.with_borrow_mut(|tray| {
                     tray.as_mut()
                         .map(|tray| {

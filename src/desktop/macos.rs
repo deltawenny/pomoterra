@@ -38,8 +38,12 @@ define_class!(
     unsafe impl NSWindowDelegate for WindowDelegate {
         #[unsafe(method(windowShouldClose:))]
         fn should_close(&self, window: &NSWindow) -> bool {
-            window.orderOut(None);
-            false
+            if super::close_to_tray() {
+                window.orderOut(None);
+                false
+            } else {
+                true
+            }
         }
     }
 );
@@ -94,6 +98,12 @@ fn poll() {
             }
         }
         let state = slot.as_mut().unwrap();
+        if super::take_show_request() {
+            if state.window.isMiniaturized() {
+                state.window.deminiaturize(None);
+            }
+            state.window.makeKeyAndOrderFront(None);
+        }
         state.tray.update();
         for action in state.tray.actions() {
             match action {

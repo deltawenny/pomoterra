@@ -53,7 +53,9 @@
 
 - **A focused timer** — a blue countdown ring, start/pause, reset, skip, and full-screen controls. Start with 25 minutes of focus, 5-minute breaks, and a 15-minute break after every four focus sessions.
 
-- **Your own rhythm** — customize focus time, short and long breaks, and the number of rounds. Each new session waits for you to press Start.
+- **Your own rhythm** — customize focus time, short and long breaks, and the number of rounds. Sessions wait for Start by default; Settings can automatically continue after focus, breaks, or both.
+
+- **Application settings** — choose completion notifications, bring the window forward after focus or breaks, control close-to-tray behavior, and pin profiles as quick-switch shortcuts. Settings persist across restarts and can be restored to defaults. Language preferences are saved, but interface translations and Discord Rich Presence are not available yet.
 
 - **Scheduled breaks** — set up to four daily breaks for lunch, a walk, or anything else. A scheduled break can interrupt an active focus session and preserve the remaining focus time for you to resume afterward.
 
@@ -85,7 +87,7 @@ Download a package for your system from the **[latest release](https://github.co
 
 Every download includes a SHA-256 checksum. See the [installation and verification guide](docs/technical-guide.md#install-and-verify) for details and platform limitations.
 
-> **Background operation:** closing the window hides the app to the system tray or macOS menu bar when a tray host is available. On Linux, a StatusNotifier-compatible tray host is required; if unavailable, closing exits normally.
+> **Background operation:** with Close to Tray enabled (the default), closing the window hides the app to the system tray or macOS menu bar when a tray host is available. On Linux, a StatusNotifier-compatible tray host is required; if unavailable, closing exits normally. Native completion notifications depend on operating-system permissions and notification services.
 
 ## :hammer_and_wrench: Development
 

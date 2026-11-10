@@ -1,6 +1,24 @@
 import { expect, open, test } from "nsh/test";
 
 // Run with POMOTERRA_DB_PATH=:memory: to isolate each app instance.
+test("opens Settings, changes preferences, and restores defaults", async () => {
+  const app = await open(".");
+  await app.press("Settings");
+  expect(app.texts()).toContain("SETTINGS");
+  expect(app.texts()).toContain("Language");
+  expect(app.texts()).toContain("Discord Rich Presence");
+  expect(app.texts()).toContain("Quick switch configuration profiles");
+  await app.press("Show window after focus session");
+  await app.press("Show window after break session");
+  await app.press("Close to Tray");
+  await app.press("System notifications");
+  await app.press("Continue after focus");
+  await app.press("Continue after break");
+  await app.press("Restore to Default");
+  await app.press("Timer");
+  expect(app.texts()).toContain("25 : 00");
+});
+
 test("creates and edits a payable profile, then deletes it", async () => {
   const app = await open(".");
   await app.press("Config");

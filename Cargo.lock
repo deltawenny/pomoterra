@@ -4247,6 +4247,7 @@ dependencies = [
  "fontdue",
  "ksni",
  "lucide-icons",
+ "notify-rust",
  "nsh-base",
  "nsh-core",
  "nsh-platform-gpui",

@@ -12,6 +12,36 @@ use models::{Setting, StoredProfile, StoredSession};
 
 use crate::store::{CompletedFocus, TimerRules};
 
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct AppSettings {
+    pub language: String,
+    pub show_after_focus: bool,
+    pub show_after_break: bool,
+    pub rich_presence: bool,
+    pub close_to_tray: bool,
+    pub system_notifications: bool,
+    pub continue_after_focus: bool,
+    pub continue_after_break: bool,
+    pub quick_profiles: Vec<i64>,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            language: "English".into(),
+            show_after_focus: false,
+            show_after_break: false,
+            rich_presence: false,
+            close_to_tray: true,
+            system_notifications: true,
+            continue_after_focus: false,
+            continue_after_break: false,
+            quick_profiles: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Profile {
     pub id: i64,
@@ -241,6 +271,43 @@ impl Database {
         .ok()
     }
 
+    pub fn settings(&self) -> Result<AppSettings> {
+        let value = self.run(async |db| {
+            Setting::filter_by_key("app_settings")
+                .first()
+                .exec(db)
+                .await
+        })?;
+        value
+            .map(|setting| serde_json::from_str(&setting.value).map_err(|error| error.to_string()))
+            .unwrap_or_else(|| Ok(AppSettings::default()))
+    }
+
+    pub fn save_settings(&self, settings: &AppSettings) -> Result<()> {
+        let value = serde_json::to_string(settings).map_err(|error| error.to_string())?;
+        self.run(async |db| {
+            if Setting::filter_by_key("app_settings")
+                .first()
+                .exec(db)
+                .await?
+                .is_some()
+            {
+                Setting::filter_by_key("app_settings")
+                    .update()
+                    .value(value)
+                    .exec(db)
+                    .await?;
+            } else {
+                Setting::create()
+                    .key("app_settings")
+                    .value(value)
+                    .exec(db)
+                    .await?;
+            }
+            Ok(())
+        })
+    }
+
     pub fn record(&self, profile: &Profile, focus: &CompletedFocus) -> Result<()> {
         let seconds = i64::try_from(focus.seconds).map_err(|e| e.to_string())?;
         if seconds == 0 {
@@ -316,6 +383,7 @@ pub struct Library {
     pub database: Option<Rc<Database>>,
     pub profiles: Vec<Profile>,
     pub sessions: Vec<Session>,
+    pub settings: AppSettings,
     pub error: String,
 }
 
@@ -323,6 +391,7 @@ impl PartialEq for Library {
     fn eq(&self, other: &Self) -> bool {
         self.profiles == other.profiles
             && self.sessions == other.sessions
+            && self.settings == other.settings
             && self.error == other.error
     }
 }
@@ -333,21 +402,46 @@ impl Library {
             Ok((
                 database.profiles()?,
                 database.sessions()?,
+                database.settings()?,
                 Rc::new(database),
             ))
         }) {
-            Ok((profiles, sessions, database)) => Self {
+            Ok((profiles, sessions, settings, database)) => Self {
                 database: Some(database),
                 profiles,
                 sessions,
+                settings,
                 error: String::new(),
             },
             Err(error) => Self {
                 database: None,
                 profiles: vec![],
                 sessions: vec![],
+                settings: AppSettings::default(),
                 error: format!("Storage unavailable: {error}"),
             },
+        }
+    }
+
+    pub fn update_settings(&mut self, edit: impl FnOnce(&mut AppSettings)) {
+        let mut settings = self.settings.clone();
+        edit(&mut settings);
+        settings
+            .quick_profiles
+            .retain(|id| self.profiles.iter().any(|p| p.id == *id));
+        settings.quick_profiles.sort_unstable();
+        settings.quick_profiles.dedup();
+        let result = self
+            .database
+            .as_ref()
+            .ok_or_else(|| "Storage unavailable".to_owned())
+            .and_then(|db| db.save_settings(&settings));
+        match result {
+            Ok(()) => {
+                self.settings = settings;
+                self.error.clear();
+            }
+            Err(error) => self.error = error,
         }
     }
 
@@ -388,6 +482,50 @@ pub fn color(value: &str) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_settings_fields_use_defaults() {
+        let settings: AppSettings =
+            serde_json::from_str(r#"{"continue_after_focus":true}"#).unwrap();
+        assert!(settings.continue_after_focus);
+        assert!(settings.close_to_tray);
+        assert!(settings.system_notifications);
+        assert!(!settings.continue_after_break);
+        assert_eq!(settings.language, "English");
+        assert!(settings.quick_profiles.is_empty());
+    }
+
+    #[test]
+    fn settings_updates_persist_normalize_shortcuts_and_restore_defaults() {
+        let db = Rc::new(Database::open_path(Path::new(":memory:")).unwrap());
+        assert_eq!(db.settings().unwrap(), AppSettings::default());
+        let profile = db.profiles().unwrap().remove(0);
+        let mut library = Library {
+            profiles: vec![profile.clone()],
+            sessions: vec![],
+            settings: AppSettings::default(),
+            database: Some(db.clone()),
+            error: String::new(),
+        };
+        library.update_settings(|settings| {
+            settings.show_after_focus = true;
+            settings.show_after_break = true;
+            settings.close_to_tray = false;
+            settings.system_notifications = false;
+            settings.continue_after_focus = true;
+            settings.continue_after_break = true;
+            settings.quick_profiles = vec![profile.id, i64::MAX, profile.id];
+        });
+        assert!(library.error.is_empty());
+        assert_eq!(library.settings.quick_profiles, [profile.id]);
+        assert_eq!(db.settings().unwrap(), library.settings);
+        library.update_settings(|settings| *settings = AppSettings::default());
+        assert_eq!(db.settings().unwrap(), AppSettings::default());
+        library.database = None;
+        library.update_settings(|settings| settings.close_to_tray = false);
+        assert!(!library.error.is_empty());
+        assert_eq!(library.settings, AppSettings::default());
+    }
 
     #[test]
     fn memory_databases_are_isolated_and_selection_can_be_replaced() {
@@ -481,6 +619,7 @@ mod tests {
         let mut library = Library {
             profiles: db.profiles().unwrap(),
             sessions: db.sessions().unwrap(),
+            settings: AppSettings::default(),
             database: Some(db.clone()),
             error: String::new(),
         };
@@ -535,6 +674,10 @@ mod tests {
             let db = Database::open_path(&path).unwrap();
             let profile = db.create_profile("Persistent").unwrap();
             db.select(profile.id).unwrap();
+            let mut settings = AppSettings::default();
+            settings.language = "Español".into();
+            settings.quick_profiles.push(profile.id);
+            db.save_settings(&settings).unwrap();
             db.record(
                 &profile,
                 &CompletedFocus {
@@ -550,6 +693,9 @@ mod tests {
         let profile = &db.profiles().unwrap()[1];
         assert_eq!(profile.name, "Persistent");
         assert_eq!(db.selected(), Some(profile.id));
+        let settings = db.settings().unwrap();
+        assert_eq!(settings.language, "Español");
+        assert_eq!(settings.quick_profiles, [profile.id]);
         let sessions = db.sessions().unwrap();
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].profile_id, profile.id);
