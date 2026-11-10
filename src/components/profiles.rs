@@ -86,6 +86,101 @@ pub(crate) fn profile_picker(
         })
 }
 
+/// A single-height shortcut strip, shared by the timer and profile settings.
+/// Long names are truncated; additional profiles scroll instead of squeezing
+/// the timer or overflowing the window at its minimum width.
+pub(crate) fn quick_profile_switcher(
+    timer: Signal<TimerState>,
+    library: Signal<Library>,
+    active: Signal<i64>,
+) -> View {
+    view()
+        .w_full()
+        .flex_shrink_0()
+        .min_w(px(0.0))
+        .child(dynamic(move || {
+            let data = library.get();
+            let profiles: Vec<_> = data
+                .settings
+                .quick_profiles
+                .iter()
+                .filter_map(|id| data.profiles.iter().find(|profile| profile.id == *id))
+                .collect();
+            if profiles.is_empty() {
+                return view();
+            }
+            view().mt(px(8.0)).child(
+                nsh_core::element::scroll().horizontal().h(px(42.0)).child(
+                    view().flex_row().items_start().gap(px(6.0)).children(
+                        profiles
+                            .into_iter()
+                            .map(|profile| {
+                                let id = profile.id;
+                                let name = profile.name.clone();
+                                let accent = color(&profile.color).unwrap_or(BLUE);
+                                view()
+                                    .h(px(30.0))
+                                    .max_w(px(180.0))
+                                    .flex_shrink_0()
+                                    .flex_row()
+                                    .items_center()
+                                    .gap(px(6.0))
+                                    .px(px(10.0))
+                                    .rounded(px(15.0))
+                                    .border_1()
+                                    .border_color(move || {
+                                        rgb(if active.get() == id { BLUE } else { 0xe0e6eb })
+                                    })
+                                    .bg(move || {
+                                        rgb(if active.get() == id {
+                                            0xeaf5fb
+                                        } else {
+                                            0xf7f9fb
+                                        })
+                                    })
+                                    .hover(|s| s.bg(rgb(0xeaf5fb)))
+                                    .active(|s| s.bg(rgb(0xdceef8)))
+                                    .role(AccessibilityRole::Button)
+                                    .label(move || {
+                                        format!(
+                                            "Switch to {name}{}",
+                                            if active.get() == id {
+                                                " (current profile)"
+                                            } else {
+                                                ""
+                                            }
+                                        )
+                                    })
+                                    .on_press(move || {
+                                        if active.get() != id {
+                                            choose(timer, library, active, id);
+                                        }
+                                    })
+                                    .child(
+                                        view()
+                                            .w(px(7.0))
+                                            .h(px(7.0))
+                                            .flex_shrink_0()
+                                            .rounded(px(4.0))
+                                            .bg(rgb(accent)),
+                                    )
+                                    .child(
+                                        text(profile.name.clone())
+                                            .min_w(px(0.0))
+                                            .text_size(px(12.0))
+                                            .truncate()
+                                            .text_color(move || {
+                                                rgb(if active.get() == id { BLUE } else { GREY })
+                                            }),
+                                    )
+                            })
+                            .collect::<Vec<_>>(),
+                    ),
+                ),
+            )
+        }))
+}
+
 pub(crate) fn profile_settings(
     timer: Signal<TimerState>,
     library: Signal<Library>,

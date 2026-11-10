@@ -251,23 +251,5 @@ fn quick_profiles(
                     });
                 }),
         )
-        .child(dynamic(move || {
-            let ids = library.get().settings.quick_profiles.clone();
-            view().flex_row().gap(px(6.0)).children(
-                ids.into_iter()
-                    .filter_map(|id| {
-                        let name = library
-                            .get()
-                            .profiles
-                            .iter()
-                            .find(|profile| profile.id == id)?
-                            .name
-                            .clone();
-                        Some(profiles::dynamic_text_button(name, move || {
-                            profiles::choose(timer, library, active, id)
-                        }))
-                    })
-                    .collect::<Vec<_>>(),
-            )
-        }))
+        .child(profiles::quick_profile_switcher(timer, library, active))
 }

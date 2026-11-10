@@ -14,7 +14,7 @@ pub(crate) use config::config_tab;
 pub(crate) use controls::timer_controls;
 pub(crate) use header::{Tab, tab_header};
 pub(crate) use history::history_tab;
-pub(crate) use profiles::{choose as choose_profile, dynamic_text_button, profile_picker};
+pub(crate) use profiles::{choose as choose_profile, profile_picker, quick_profile_switcher};
 pub(crate) use session_note::session_note;
 pub(crate) use settings::settings_tab;
 pub(crate) use timer_display::timer_display;

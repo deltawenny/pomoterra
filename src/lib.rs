@@ -13,7 +13,7 @@ mod desktop;
 
 use chrono::{Datelike, Local, Timelike};
 use components::{
-    GREY, Tab, choose_profile, config_tab, dynamic_text_button, history_tab, profile_picker,
+    GREY, Tab, choose_profile, config_tab, history_tab, profile_picker, quick_profile_switcher,
     session_note, settings_tab, tab_header, timer_controls, timer_display,
 };
 use nsh_core::prelude::*;
@@ -66,7 +66,7 @@ fn flush_completed(timer: Signal<TimerState>, library: Signal<Library>, profile_
 
 /// Minimum desktop content size in logical pixels, also used at startup.
 /// Native window decorations are added by each platform, not included here.
-pub const MIN_WINDOW_SIZE: (i32, i32) = (340, 488);
+pub const MIN_WINDOW_SIZE: (i32, i32) = (340, 552);
 
 // NSH 0.4 has no window-size constraints API. Apply GTK's native minimum
 // on its UI thread so this works with both `cargo run` and `nsh run`.
@@ -271,21 +271,9 @@ pub fn App() -> impl IntoElement {
                         .px(px(16.0))
                         .pt(px(8.0))
                         .flex_shrink_0()
-                        .child(profile_picker(timer, library, active, || {})),
+                        .child(profile_picker(timer, library, active, || {}))
+                        .child(quick_profile_switcher(timer, library, active)),
                 )
-                .child(nsh_core::element::dynamic(move || {
-                    let ids = library.get().settings.quick_profiles.clone();
-                    let mut row = view().px(px(16.0)).pb(px(4.0)).flex_row().gap(px(5.0));
-                    for id in ids {
-                        if let Some(profile) = library.get().profiles.iter().find(|p| p.id == id) {
-                            let name = profile.name.clone();
-                            row = row.child(dynamic_text_button(name, move || {
-                                choose_profile(timer, library, active, id);
-                            }));
-                        }
-                    }
-                    row
-                }))
                 .child(timer_display(timer))
                 .child(
                     view()
