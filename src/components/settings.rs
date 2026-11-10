@@ -33,18 +33,13 @@ pub(crate) fn settings_tab(
                 .items_center()
                 .justify_between()
                 .child(
-                    text("SETTINGS")
+                    text(crate::i18n::tr("SETTINGS"))
                         .text_size(px(14.0))
                         .text_color(rgb(0x111111)),
                 )
                 .child(profiles::text_button("Restore to Default", restore)),
         )
         .child(language_setting(library))
-        .child(
-            text("Language preference is saved; interface translations are not available yet.")
-                .text_size(px(11.0))
-                .text_color(rgb(GREY)),
-        )
         .child(toggle_row(
             library,
             "Show window after focus session",
@@ -111,7 +106,11 @@ fn card() -> View {
 
 fn language_setting(library: Signal<Library>) -> View {
     card()
-        .child(text("Language").flex_1().text_size(px(13.0)))
+        .child(
+            text(crate::i18n::tr("Language"))
+                .flex_1()
+                .text_size(px(13.0)),
+        )
         .child(
             view().w(px(150.0)).flex_shrink_0().child(
                 combobox()
@@ -123,8 +122,8 @@ fn language_setting(library: Signal<Library>) -> View {
                         )
                     })
                     .value(move || Some(vec![library.get().settings.language.clone().into()]))
-                    .accessibility_label("Language")
-                    .placeholder("Language")
+                    .accessibility_label(crate::i18n::optional("Language"))
+                    .placeholder(crate::i18n::optional("Language"))
                     .on_change(move |value: &Vec<SharedString>| {
                         if let Some(value) = value.first() {
                             library.update(|data| {
@@ -147,7 +146,7 @@ fn toggle_row(
 ) -> View {
     card()
         .role(AccessibilityRole::Checkbox)
-        .label(label)
+        .label(crate::i18n::tr(label))
         .on_press(move || {
             let value = !get(&library.get().settings);
             library.update(|data| data.update_settings(|settings| set(settings, value)));
@@ -156,8 +155,16 @@ fn toggle_row(
             view()
                 .flex_1()
                 .gap(px(3.0))
-                .child(text(label).text_size(px(13.0)).text_color(rgb(0x222222)))
-                .child(text(description).text_size(px(11.0)).text_color(rgb(GREY))),
+                .child(
+                    text(crate::i18n::tr(label))
+                        .text_size(px(13.0))
+                        .text_color(rgb(0x222222)),
+                )
+                .child(
+                    text(crate::i18n::tr(description))
+                        .text_size(px(11.0))
+                        .text_color(rgb(GREY)),
+                ),
         )
         .child(
             view()
@@ -195,8 +202,16 @@ fn info_row(label: &'static str, description: &'static str, glyph: Icon) -> View
             view()
                 .flex_1()
                 .gap(px(3.0))
-                .child(text(label).text_size(px(13.0)).text_color(rgb(0x222222)))
-                .child(text(description).text_size(px(11.0)).text_color(rgb(GREY))),
+                .child(
+                    text(crate::i18n::tr(label))
+                        .text_size(px(13.0))
+                        .text_color(rgb(0x222222)),
+                )
+                .child(
+                    text(crate::i18n::tr(description))
+                        .text_size(px(11.0))
+                        .text_color(rgb(GREY)),
+                ),
         )
         .child(icon(glyph, GREY, 18.0))
 }
@@ -211,14 +226,16 @@ fn quick_profiles(
         .items_start()
         .gap(px(8.0))
         .child(
-            text("Quick switch configuration profiles")
+            text(crate::i18n::tr("Quick switch configuration profiles"))
                 .text_size(px(13.0))
                 .text_color(rgb(0x222222)),
         )
         .child(
-            text("Choose profiles for quick switching on the Timer tab and in the tray menu.")
-                .text_size(px(11.0))
-                .text_color(rgb(GREY)),
+            text(crate::i18n::tr(
+                "Choose profiles for quick switching on the Timer tab and in the tray menu.",
+            ))
+            .text_size(px(11.0))
+            .text_color(rgb(GREY)),
         )
         .child(
             combobox()
@@ -239,8 +256,8 @@ fn quick_profiles(
                             .collect(),
                     )
                 })
-                .accessibility_label("Quick switch profiles")
-                .placeholder("Select profiles")
+                .accessibility_label(crate::i18n::optional("Quick switch profiles"))
+                .placeholder(crate::i18n::optional("Select profiles"))
                 .on_change(move |value: &Vec<SharedString>| {
                     let ids = value
                         .iter()

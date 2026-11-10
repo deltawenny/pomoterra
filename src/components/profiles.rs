@@ -20,7 +20,7 @@ pub(crate) fn action(label: &'static str, glyph: Icon, run: impl Fn() + 'static)
         .justify_center()
         .rounded(px(5.0))
         .role(AccessibilityRole::Button)
-        .label(label)
+        .label(crate::i18n::tr(label))
         .on_press(run)
         .hover(|s| s.bg(rgb(0xf0f6fa)))
         .active(|s| s.bg(rgb(0xe3eff7)))
@@ -44,7 +44,7 @@ pub(crate) fn choose(
     let result = data
         .database
         .as_ref()
-        .ok_or_else(|| "Storage unavailable".to_owned())
+        .ok_or_else(|| crate::i18n::t("Storage unavailable"))
         .and_then(|db| db.select(id));
     if let Err(error) = result {
         library.update(|data| data.error = error);
@@ -76,8 +76,8 @@ pub(crate) fn profile_picker(
             )
         })
         .value(move || Some(vec![active.get().to_string().into()]))
-        .accessibility_label("Configuration profile")
-        .placeholder("Search profiles")
+        .accessibility_label(crate::i18n::optional("Configuration profile"))
+        .placeholder(crate::i18n::optional("Search profiles"))
         .on_change(move |value: &Vec<SharedString>| {
             if let Some(id) = value.first().and_then(|v| v.parse().ok()) {
                 choose(timer, library, active, id);
@@ -142,13 +142,19 @@ pub(crate) fn quick_profile_switcher(
                                     .active(|s| s.bg(rgb(0xdceef8)))
                                     .role(AccessibilityRole::Button)
                                     .label(move || {
-                                        format!(
-                                            "Switch to {name}{}",
-                                            if active.get() == id {
-                                                " (current profile)"
-                                            } else {
-                                                ""
-                                            }
+                                        crate::i18n::message(
+                                            "Switch to {name}{current}",
+                                            &[
+                                                ("name", name.clone()),
+                                                (
+                                                    "current",
+                                                    if active.get() == id {
+                                                        crate::i18n::t(" (current profile)")
+                                                    } else {
+                                                        String::new()
+                                                    },
+                                                ),
+                                            ],
                                         )
                                     })
                                     .on_press(move || {
@@ -199,7 +205,7 @@ pub(crate) fn profile_settings(
         }
     });
     view().gap(px(10.0)).mb(px(26.0))
-        .child(text("Configuration Profile").text_size(px(12.0)).text_color(rgb(0x333333)))
+        .child(text(crate::i18n::tr("Configuration Profile")).text_size(px(12.0)).text_color(rgb(0x333333)))
         .child(view().flex_row().items_center().gap(px(4.0))
             .child(view().flex_1().min_w(px(0.0)).child(profile_picker(timer, library, active, move || {
                 editing.set(false);
@@ -207,8 +213,8 @@ pub(crate) fn profile_settings(
             })))
             .child(action("Add profile", Icon::Plus, move || {
                 let data = library.get();
-                let result = data.database.as_ref().ok_or_else(|| "Storage unavailable".to_owned())
-                    .and_then(|db| db.create_profile(&format!("Profile {}", data.profiles.iter().map(|p| p.id).max().unwrap_or(0) + 1)));
+                let result = data.database.as_ref().ok_or_else(|| crate::i18n::t("Storage unavailable"))
+                    .and_then(|db| db.create_profile(&format!("{} {}", crate::i18n::t("Profile"), data.profiles.iter().map(|p| p.id).max().unwrap_or(0) + 1)));
                 match result {
                     Ok(profile) => {
                         let id = profile.id;
@@ -227,7 +233,7 @@ pub(crate) fn profile_settings(
             .child(action("Delete profile", Icon::Trash2, move || deleting.set(true))))
         .child(when(move || editing.get(), move || view().flex_row().gap(px(6.0))
             .child(text_input(|| false).flex_1()
-                .label("Profile name").value(move || name.get())
+                .label(crate::i18n::tr("Profile name")).value(move || name.get())
                 .on_change(move |value: &str| name.set(value.to_owned())))
             .child(action("Save profile name", Icon::Check, move || {
                 library.update(|data| data.edit(active.get(), |p| p.name = name.get()));
@@ -241,13 +247,13 @@ pub(crate) fn profile_settings(
             .border_color(rgb(0xe0b4b4))
             .rounded(px(6.0))
             .bg(rgb(0xfff8f8))
-            .child(text("Delete this profile?").text_size(px(12.0)).text_color(rgb(0x6f2222)))
-            .child(text("Its history will be kept.").text_size(px(12.0)).text_color(rgb(0x555555)))
+            .child(text(crate::i18n::tr("Delete this profile?")).text_size(px(12.0)).text_color(rgb(0x6f2222)))
+            .child(text(crate::i18n::tr("Its history will be kept.")).text_size(px(12.0)).text_color(rgb(0x555555)))
             .child(view().flex_row().gap(px(8.0))
                 .child(text_button("Confirm delete", move || {
                     let data = library.get();
                     if data.profiles.len() <= 1 {
-                        library.update(|data| data.error = "Keep at least one profile. Add another before deleting this one.".into());
+                        library.update(|data| data.error = crate::i18n::t("Keep at least one profile. Add another before deleting this one."));
                         deleting.set(false); return;
                     }
                     let id = active.get();
@@ -262,41 +268,41 @@ pub(crate) fn profile_settings(
                 }))
                 .child(text_button("Cancel delete", move || deleting.set(false))))))
         .child(view().flex_row().items_center().gap(px(8.0))
-            .role(AccessibilityRole::Checkbox).label("Payable")
+            .role(AccessibilityRole::Checkbox).label(crate::i18n::tr("Payable"))
             .on_press(move || library.update(|data| data.edit(active.get(), |p| p.payable = !p.payable)))
             .child(view().w(px(20.0)).h(px(20.0)).border_1().border_color(rgb(BLUE)).rounded(px(3.0))
                 .child(when(move || library.get().profiles.iter().find(|p| p.id == active.get()).is_some_and(|p| p.payable), move || icon(Icon::Check, BLUE, 18.0))))
-            .child(text("Payable").text_size(px(13.0))))
+            .child(text(crate::i18n::tr("Payable")).text_size(px(13.0))))
         .child(when(move || library.get().profiles.iter().find(|p| p.id == active.get()).is_some_and(|p| p.payable), move || {
             view().flex_row().gap(px(8.0)).items_center()
                 .child(text_input(move || parse_rate(&rate.get()).is_none()).flex_1()
-                    .label("Hourly rate").placeholder("0.00 / hour")
+                    .label(crate::i18n::tr("Hourly rate")).placeholder(crate::i18n::tr("0.00 / hour"))
                     .value(move || rate.get()).on_change(move |value: &str| {
                         rate.set(value.to_owned());
                         if let Some(value) = parse_rate(value) { library.update(|data| data.edit(active.get(), |p| p.rate = value)); }
                     }))
                 .child(view().w(px(88.0)).flex_shrink_0().child(combobox().items(sorted_items(["USD", "EUR", "GBP", "RUB", "JPY", "CAD", "AUD", "CHF", "INR"].into_iter().map(|v| SelectItem::new(v, v))))
                     .value(move || Some(vec![library.get().profiles.iter().find(|p| p.id == active.get()).map(|p| p.currency.clone()).unwrap_or_else(|| "USD".into()).into()]))
-                    .accessibility_label("Currency")
-                    .placeholder("Currency")
-                    .empty(text("No matching currencies").text_size(px(12.0)).text_color(rgb(GREY)).p(px(12.0)))
+                    .accessibility_label(crate::i18n::optional("Currency"))
+                    .placeholder(crate::i18n::optional("Currency"))
+                    .empty(text(crate::i18n::tr("No matching currencies")).text_size(px(12.0)).text_color(rgb(GREY)).p(px(12.0)))
                     .popup_class("min-w-[88px] bg-white border border-[#dddddd] rounded-md p-1 shadow-lg")
                     .on_change(move |value: &Vec<SharedString>| { if let Some(value) = value.first() { library.update(|data| data.edit(active.get(), |p| p.currency = value.to_string())); } })))
-                .child(text("/ hour").text_size(px(11.0)))
+                .child(text(crate::i18n::tr("/ hour")).text_size(px(11.0)))
         }))
-        .child(text("Profile color").text_size(px(12.0)))
+        .child(text(crate::i18n::tr("Profile color")).text_size(px(12.0)))
         .child(view().flex_row().gap(px(8.0)).items_center()
             .children(["#0083c9", "#008c69", "#a855f7", "#e05274", "#e5a100", "#e76f35"].into_iter().map(move |value| {
                 view().w(px(22.0)).h(px(22.0)).rounded(px(11.0)).bg(rgb(color(value).unwrap())).border_2()
                     .border_color(move || rgb(if library.get().profiles.iter().find(|p| p.id == active.get()).is_some_and(|p| p.color == value) { 0x222222 } else { 0xffffff }))
-                    .role(AccessibilityRole::Button).label(format!("Use color {value}"))
+                    .role(AccessibilityRole::Button).label(move || crate::i18n::message("Use color {value}", &[("value", value.into())]))
                     .on_press(move || {
                         library.update(|data| data.edit(active.get(), |p| p.color = value.into()));
                         color_text.set(value.into());
                     })
             }))
             .child(text_input(move || color(&color_text.get()).is_none()).flex_1()
-                .label("Profile color hex").placeholder("#0083c9")
+                .label(crate::i18n::tr("Profile color hex")).placeholder(crate::i18n::tr("#0083c9"))
                 .value(move || color_text.get()).on_change(move |value: &str| {
                     color_text.set(value.to_owned());
                     if color(value).is_some() { library.update(|data| data.edit(active.get(), |p| p.color = value.to_owned())); }
@@ -310,14 +316,18 @@ pub(crate) fn text_button(label: &'static str, run: impl Fn() + 'static) -> View
 pub(crate) fn dynamic_text_button(label: String, run: impl Fn() + 'static) -> View {
     view()
         .role(AccessibilityRole::Button)
-        .label(label.clone())
+        .label(crate::i18n::tr(label.clone()))
         .on_press(run)
         .px(px(8.0))
         .py(px(5.0))
         .rounded(px(4.0))
         .hover(|s| s.bg(rgb(0xeaf5fb)))
         .active(|s| s.bg(rgb(0xdceef8)))
-        .child(text(label).text_size(px(12.0)).text_color(rgb(BLUE)))
+        .child(
+            text(crate::i18n::tr(label))
+                .text_size(px(12.0))
+                .text_color(rgb(BLUE)),
+        )
 }
 
 fn parse_rate(value: &str) -> Option<i64> {

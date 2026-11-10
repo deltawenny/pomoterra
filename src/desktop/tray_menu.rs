@@ -19,6 +19,7 @@ pub(super) struct QuickProfile {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct TrayMenu {
+    pub language: crate::i18n::Language,
     pub profile: String,
     pub phase: String,
     pub time: String,
@@ -29,6 +30,7 @@ pub(super) struct TrayMenu {
 impl Default for TrayMenu {
     fn default() -> Self {
         Self {
+            language: Default::default(),
             profile: "Profile: —".into(),
             phase: "Focus · Paused".into(),
             time: "25:00 / 25:00".into(),
@@ -40,6 +42,7 @@ impl Default for TrayMenu {
 
 impl TrayMenu {
     fn snapshot(timer: &TimerState, library: &Library, active: i64) -> Self {
+        let language = crate::i18n::Language::from_preference(&library.settings.language);
         let name = library
             .profiles
             .iter()
@@ -71,9 +74,14 @@ impl TrayMenu {
         });
         profiles.dedup_by_key(|p| p.id);
         Self {
+            language,
             running: timer.running,
-            profile: format!("Profile: {name}"),
-            phase: format!("{phase} · {status}"),
+            profile: format!("{}: {name}", language.translate("Profile")),
+            phase: format!(
+                "{} · {}",
+                language.translate(phase),
+                language.translate(status)
+            ),
             time: format!(
                 "{:02}:{:02} / {:02}:{:02}",
                 timer.remaining / 60,
@@ -85,8 +93,12 @@ impl TrayMenu {
         }
     }
 
-    pub(super) fn playback_label(&self) -> &'static str {
-        if self.running { "Stop" } else { "Play" }
+    pub(super) fn playback_label(&self) -> String {
+        self.translate(if self.running { "Stop" } else { "Play" })
+    }
+
+    pub(super) fn translate(&self, key: &str) -> String {
+        self.language.translate(key)
     }
 
     pub(super) fn current() -> Self {
@@ -157,6 +169,24 @@ mod tests {
             TrayMenu::snapshot(&TimerState::default(), &library, 1).profile,
             "Profile: Renamed"
         );
+    }
+
+    #[test]
+    fn spanish_snapshot_translates_status_and_actions() {
+        let mut library = library();
+        library.settings.language = "Español".into();
+        let mut timer = TimerState::default();
+        let menu = TrayMenu::snapshot(&timer, &library, 0);
+        assert_eq!(menu.profile, "Perfil: —");
+        assert_eq!(menu.phase, "Concentración · En pausa");
+        assert_eq!(menu.playback_label(), "Iniciar");
+        assert_eq!(menu.translate("Quit"), "Salir");
+        timer.skip();
+        timer.toggle(std::time::Instant::now());
+        let menu = TrayMenu::snapshot(&timer, &library, 0);
+        assert_eq!(menu.phase, "Descanso · En marcha");
+        assert_eq!(menu.playback_label(), "Detener");
+        assert_eq!(menu.time, "05:00 / 05:00");
     }
 
     #[test]

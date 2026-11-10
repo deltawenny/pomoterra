@@ -55,7 +55,15 @@ fn session_counter(timer: Signal<TimerState>) -> View {
             })
             .text_size(px(14.0)),
         )
-        .child(text("Sessions").text_size(px(14.0)))
+        .child(text(crate::i18n::tr("Sessions")).text_size(move || {
+            px(
+                if crate::i18n::language() == crate::i18n::Language::Spanish {
+                    12.0
+                } else {
+                    14.0
+                },
+            )
+        }))
 }
 
 fn play_pause_button(timer: Signal<TimerState>) -> View {
@@ -79,9 +87,9 @@ fn play_pause_button(timer: Signal<TimerState>) -> View {
         .role(AccessibilityRole::Button)
         .label(move || {
             if timer.get().running {
-                "Pause timer"
+                crate::i18n::t("Pause timer")
             } else {
-                "Start timer"
+                crate::i18n::t("Start timer")
             }
         })
         .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))
@@ -111,9 +119,9 @@ fn announcement_toggle(timer: Signal<TimerState>, announcements: Signal<bool>) -
         .role(AccessibilityRole::Button)
         .label(move || {
             if announcements.get() {
-                "Mute announcements"
+                crate::i18n::t("Mute announcements")
             } else {
-                "Enable announcements"
+                crate::i18n::t("Enable announcements")
             }
         })
         .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))
@@ -151,7 +159,7 @@ fn control(
         .justify_center()
         .rounded(px(6.0))
         .role(AccessibilityRole::Button)
-        .label(label)
+        .label(crate::i18n::tr(label))
         .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))
         .on_mouse_leave(move |_: &MouseEvent| hovered.set(false))
         .active(|s| s.opacity(0.5))

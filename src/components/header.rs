@@ -70,12 +70,20 @@ fn tab(
             })
         })
         .role(AccessibilityRole::Button)
-        .label(label)
+        .label(crate::i18n::tr(label))
         .on_press(move || selected.set(tab))
         .child(dynamic(move || icon(name, color(), 16.0)))
         .child(
-            text(label)
-                .text_size(px(13.0))
+            text(crate::i18n::tr(label))
+                .text_size(move || {
+                    px(
+                        if crate::i18n::language() == crate::i18n::Language::Spanish {
+                            11.0
+                        } else {
+                            13.0
+                        },
+                    )
+                })
                 .text_color(move || rgb(color())),
         )
 }

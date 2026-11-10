@@ -55,7 +55,7 @@
 
 - **Your own rhythm** — customize focus time, short and long breaks, and the number of rounds. Sessions wait for Start by default; Settings can automatically continue after focus, breaks, or both.
 
-- **Application settings** — choose completion notifications, bring the window forward after focus or breaks, control close-to-tray behavior, and pin profiles as quick-switch shortcuts. Settings persist across restarts and can be restored to defaults. Language preferences are saved, but interface translations and Discord Rich Presence are not available yet.
+- **Application settings** — choose completion notifications, bring the window forward after focus or breaks, control close-to-tray behavior, and pin profiles as quick-switch shortcuts. Settings persist across restarts and can be restored to defaults. English and Spanish interfaces are available: select **Español** under **Settings → Language** to switch immediately, including tray menus and completion notifications. The language choice persists across restarts. Other language preferences currently fall back to English. Discord Rich Presence is not available yet.
 
 - **Scheduled breaks** — set up to four daily breaks for lunch, a walk, or anything else. A scheduled break can interrupt an active focus session and preserve the remaining focus time for you to resume afterward.
 

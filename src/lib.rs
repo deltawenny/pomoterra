@@ -1,5 +1,6 @@
 //! A compact Pomodoro timer with configurable rules and scheduled breaks.
 mod components;
+mod i18n;
 mod icons;
 mod persistence;
 mod store;
@@ -108,6 +109,7 @@ pub fn App() -> impl IntoElement {
         initial_timer.configure(|rules| *rules = profile.rules.clone());
     }
     let library = signal(loaded);
+    i18n::provide(library);
     let active = signal(active_id);
     let timer = signal(initial_timer);
     #[cfg(all(
@@ -201,7 +203,10 @@ pub fn App() -> impl IntoElement {
                         desktop::request_show();
                     }
                     if settings.system_notifications {
-                        desktop::notify_completion(phase);
+                        desktop::notify_completion(
+                            phase,
+                            i18n::Language::from_preference(&library.get().settings.language),
+                        );
                     }
                 }
                 let continue_next = match phase {

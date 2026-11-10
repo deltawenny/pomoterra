@@ -64,7 +64,7 @@ impl ksni::Tray for Tray {
         if profiles.is_empty() {
             profiles.push(
                 StandardItem {
-                    label: "Choose quick profiles in Settings".into(),
+                    label: self.menu.translate("Choose quick profiles in Settings"),
                     enabled: false,
                     ..Default::default()
                 }
@@ -95,7 +95,7 @@ impl ksni::Tray for Tray {
         );
         menu.push(
             SubMenu {
-                label: "Switch profile".into(),
+                label: self.menu.translate("Switch profile"),
                 submenu: profiles,
                 ..Default::default()
             }
@@ -104,7 +104,7 @@ impl ksni::Tray for Tray {
         menu.push(ksni::MenuItem::Separator);
         menu.extend(vec![
             StandardItem {
-                label: "Restore the app".into(),
+                label: self.menu.translate("Restore the app"),
                 activate: Box::new(|tray: &mut Self| {
                     let _ = tray.events.send(Event::Restore);
                 }),
@@ -112,7 +112,7 @@ impl ksni::Tray for Tray {
             }
             .into(),
             StandardItem {
-                label: "Quit".into(),
+                label: self.menu.translate("Quit"),
                 activate: Box::new(|tray: &mut Self| {
                     let _ = tray.events.send(Event::Quit);
                 }),

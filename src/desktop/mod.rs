@@ -17,17 +17,18 @@ pub(crate) fn request_show() {
 }
 
 /// Notification services may block; never call them on the timer/UI thread.
-pub(crate) fn notify_completion(phase: crate::store::Phase) {
+pub(crate) fn notify_completion(phase: crate::store::Phase, language: crate::i18n::Language) {
     let body = match phase {
         crate::store::Phase::Focus => "Focus session complete. Time for a break.",
         crate::store::Phase::Break => "Break complete. Your next focus session is ready.",
     };
+    let body = language.translate(body);
     let _ = std::thread::Builder::new()
         .name("completion-notification".into())
         .spawn(move || {
             if let Err(error) = notify_rust::Notification::new()
                 .summary("Pomoterra")
-                .body(body)
+                .body(&body)
                 .appname("Pomoterra")
                 .show()
             {

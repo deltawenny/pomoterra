@@ -45,14 +45,14 @@ pub(crate) fn config_tab(
                 .child(
                     view()
                         .role(AccessibilityRole::Button)
-                        .label("Restore Default")
+                        .label(crate::i18n::tr("Restore Default"))
                         .on_press(move || {
                             timer.update(|state| {
                                 state.configure(|rules| *rules = TimerRules::default())
                             })
                         })
                         .child(
-                            text("Restore Default")
+                            text(crate::i18n::tr("Restore Default"))
                                 .text_size(px(13.0))
                                 .text_color(rgb(GREY)),
                         ),
@@ -73,7 +73,9 @@ pub(crate) fn config_tab(
 }
 
 fn section_title(label: &'static str) -> Text {
-    text(label).text_size(px(14.0)).text_color(rgb(0x111111))
+    text(crate::i18n::tr(label))
+        .text_size(px(14.0))
+        .text_color(rgb(0x111111))
 }
 
 fn rule_slider(timer: Signal<TimerState>, rule: Rule, label: &'static str, max: f64) -> View {
@@ -84,16 +86,16 @@ fn rule_slider(timer: Signal<TimerState>, rule: Rule, label: &'static str, max: 
             view()
                 .flex_row()
                 .justify_between()
-                .child(text(label).text_size(px(13.0)))
+                .child(text(crate::i18n::tr(label)).text_size(px(13.0)))
                 .child(
                     text(move || {
                         let value = rule.value(&timer.get().rules);
                         format!(
                             "{value} {}",
                             if matches!(rule, Rule::Rounds) {
-                                "rounds"
+                                crate::i18n::t("rounds")
                             } else {
-                                "mins"
+                                crate::i18n::t("mins")
                             }
                         )
                     })
@@ -106,7 +108,7 @@ fn rule_slider(timer: Signal<TimerState>, rule: Rule, label: &'static str, max: 
                 .max(max)
                 .step(1.0)
                 .value(move || SliderValue::Single(f64::from(rule.value(&timer.get().rules))))
-                .accessibility_label(label)
+                .accessibility_label(crate::i18n::optional(label))
                 .track_class("h-6 justify-center")
                 .indicator_class("h-1.5 rounded-full bg-[#e5e5e5]")
                 .range_class("h-full rounded-full bg-[#0083c9]")
@@ -146,8 +148,13 @@ fn special_break(timer: Signal<TimerState>, index: usize) -> View {
             input_content()
                 .flex_1()
                 .h_full()
-                .label(format!("Special break {} start time (HH:MM)", index + 1))
-                .placeholder("--:--")
+                .label(move || {
+                    crate::i18n::message(
+                        "Special break {number} start time (HH:MM)",
+                        &[("number", (index + 1).to_string())],
+                    )
+                })
+                .placeholder(crate::i18n::tr("--:--"))
                 .value(move || timer.get().rules.special_breaks[index].time.clone())
                 .on_change(move |value: &str| {
                     timer.update(|state| {
@@ -161,11 +168,13 @@ fn special_break(timer: Signal<TimerState>, index: usize) -> View {
                 .h_full()
                 .border_l_1()
                 .border_color(rgb(0xcccccc))
-                .label(format!(
-                    "Special break {} duration in minutes (1–180)",
-                    index + 1
-                ))
-                .placeholder("min")
+                .label(move || {
+                    crate::i18n::message(
+                        "Special break {number} duration in minutes (1–180)",
+                        &[("number", (index + 1).to_string())],
+                    )
+                })
+                .placeholder(crate::i18n::tr("min"))
                 .value(move || timer.get().rules.special_breaks[index].minutes.clone())
                 .on_change(move |value: &str| {
                     timer.update(|state| {
