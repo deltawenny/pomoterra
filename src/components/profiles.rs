@@ -205,7 +205,7 @@ pub(crate) fn profile_settings(
         }
     });
     view().gap(px(10.0)).mb(px(26.0))
-        .child(text(crate::i18n::tr("configuration_profile_heading")).text_size(px(12.0)).text_color(rgb(0x333333)))
+        .child(super::section_title("configuration_profile_heading"))
         .child(view().flex_row().items_center().gap(px(4.0))
             .child(view().flex_1().min_w(px(0.0)).child(profile_picker(timer, library, active, move || {
                 editing.set(false);

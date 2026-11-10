@@ -131,6 +131,27 @@ fn embedded_catalogs_match_resources_and_placeholders() {
 }
 
 #[test]
+fn headings_use_uppercase_in_every_locale() {
+    let headings = [
+        "rules",
+        "settings_heading",
+        "configuration_profile_heading",
+        "timer_rules",
+        "special_breaks",
+        "focus_history",
+        "sessions_oldest_first",
+        "sessions_newest_first",
+        "focus_time_by_profile",
+    ];
+    for language in Language::ALL {
+        for key in headings {
+            let heading = language.translate(key);
+            assert_eq!(heading, heading.to_uppercase(), "{language:?}: {key}");
+        }
+    }
+}
+
+#[test]
 fn explicit_locales_are_independent_across_threads() {
     let threads: Vec<_> = Language::ALL
         .into_iter()

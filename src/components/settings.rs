@@ -32,11 +32,7 @@ pub(crate) fn settings_tab(
                 .flex_row()
                 .items_center()
                 .justify_between()
-                .child(
-                    text(crate::i18n::tr("settings_heading"))
-                        .text_size(px(14.0))
-                        .text_color(rgb(0x111111)),
-                )
+                .child(super::section_title("settings_heading"))
                 .child(profiles::text_button("restore_to_default", restore)),
         )
         .child(language_setting(library))

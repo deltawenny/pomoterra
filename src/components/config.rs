@@ -2,7 +2,7 @@ use super::input::{input_content, input_group};
 use nsh_base::{SliderValue, slider};
 use nsh_core::prelude::*;
 
-use super::GREY;
+use super::{GREY, section_title};
 use crate::store::{TimerRules, TimerState};
 
 #[derive(Clone, Copy)]
@@ -70,12 +70,6 @@ pub(crate) fn config_tab(
                 .child(special_row(timer, 2)),
         )
         .child(view().h(px(24.0)).flex_shrink_0())
-}
-
-fn section_title(label: &'static str) -> Text {
-    text(crate::i18n::tr(label))
-        .text_size(px(14.0))
-        .text_color(rgb(0x111111))
 }
 
 fn rule_slider(timer: Signal<TimerState>, rule: Rule, label: &'static str, max: f64) -> View {

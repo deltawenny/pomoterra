@@ -57,11 +57,7 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
                     .flex_row()
                     .justify_between()
                     .items_center()
-                    .child(
-                        text(crate::i18n::tr("focus_history"))
-                            .text_size(px(17.0))
-                            .text_color(rgb(0x222222)),
-                    )
+                    .child(super::section_title("focus_history"))
                     .child(super::profiles::text_button(
                         "reverse_date_order",
                         move || oldest.update(|v| *v = !*v),

@@ -1,4 +1,5 @@
 //! Layout sections composed by the application root.
+use nsh_core::prelude::*;
 mod combobox;
 mod config;
 mod controls;
@@ -29,3 +30,11 @@ fn phase_color(phase: crate::store::Phase) -> u32 {
     }
 }
 pub(crate) const GREY: u32 = 0x686868;
+
+/// Shared typography for primary section headings; catalogs supply uppercase titles.
+fn section_title(label: &'static str) -> Text {
+    text(crate::i18n::tr(label))
+        .text_size(px(14.0))
+        .font_weight(FontWeight::NORMAL)
+        .text_color(rgb(0x222222))
+}
