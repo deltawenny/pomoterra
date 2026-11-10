@@ -1,8 +1,8 @@
 {
   "name": "pomoterra",
   "id": "com.deltawenny.pomoterra",
-  "version": "0.2.2",
-  "build": 5,
+  "version": "0.3.0",
+  "build": 6,
   "rust": ".",
   "root": "App"
 }

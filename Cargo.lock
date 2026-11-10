@@ -4237,7 +4237,7 @@ dependencies = [
 
 [[package]]
 name = "nsh-app-pomoterra"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "dirs 6.0.0",
