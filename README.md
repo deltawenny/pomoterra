@@ -91,6 +91,26 @@ Every download includes a SHA-256 checksum. See the [installation and verificati
 
 ## :hammer_and_wrench: Development
 
+### Translations
+
+Localization uses [rust-i18n](https://github.com/longbridge/rust-i18n), with compile-time
+catalogs in [English](locales/en.json), [Spanish](locales/es.json), and
+[Russian](locales/ru.json). No translation files are needed beside the packaged app.
+
+- Add a stable message ID and its source text to the [English catalog](locales/en.json),
+  then add translations under the same ID in the other catalogs. Missing translations
+  fall back to English; unknown IDs are displayed unchanged.
+- Use rust-i18n's percent-prefixed named placeholders, as demonstrated by the profile
+  switching message in the [English catalog](locales/en.json). Keep placeholder names
+  identical across languages. Inserted profile names and notes are never translated
+  or reinterpreted as templates.
+- The [reactive adapters](src/i18n/reactive.rs) track the saved language preference.
+  Native integrations use the same [language adapter](src/i18n/language.rs) with an
+  explicit locale, without changing process-global locale state.
+- Rebuild after editing a catalog. The [localization tests](src/i18n/tests.rs) validate
+  embedded lookups, placeholders, English fallback, live switching, and concurrent locales.
+
+
 Pomoterra uses Rust, [NSH](https://nsh.dev/), and Toasty with bundled SQLite. Building requires **Rust 1.95 or newer** and the development libraries for your selected desktop backend.
 
 Start with the [technical guide](docs/technical-guide.md) for native and GPUI build commands, Linux prerequisites, tests, database behavior, icons, and release packaging.

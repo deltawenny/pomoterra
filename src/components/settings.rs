@@ -33,57 +33,57 @@ pub(crate) fn settings_tab(
                 .items_center()
                 .justify_between()
                 .child(
-                    text(crate::i18n::tr("settings_123"))
+                    text(crate::i18n::tr("settings_heading"))
                         .text_size(px(14.0))
                         .text_color(rgb(0x111111)),
                 )
-                .child(profiles::text_button("Restore to Default", restore)),
+                .child(profiles::text_button("restore_to_default", restore)),
         )
         .child(language_setting(library))
         .child(toggle_row(
             library,
-            "Show window after focus session",
-            "Bring the app forward when focus ends",
+            "show_window_after_focus",
+            "bring_forward_after_focus",
             |s| s.show_after_focus,
             |s, v| s.show_after_focus = v,
         ))
         .child(toggle_row(
             library,
-            "Show window after break session",
-            "Bring the app forward when a break ends",
+            "show_window_after_break",
+            "bring_forward_after_break",
             |s| s.show_after_break,
             |s, v| s.show_after_break = v,
         ))
         .child(info_row(
-            "Discord Rich Presence",
-            "Not available yet. Discord integration is not included in this build.",
+            "discord_rich_presence",
+            "discord_unavailable",
             Icon::MessageCircle,
         ))
         .child(toggle_row(
             library,
-            "Close to Tray",
-            "Keep the timer running when the window closes",
+            "close_to_tray",
+            "keep_running_on_close",
             |s| s.close_to_tray,
             |s, v| s.close_to_tray = v,
         ))
         .child(toggle_row(
             library,
-            "System notifications",
-            "Announce completed sessions in the operating system",
+            "system_notifications",
+            "announce_completed_sessions",
             |s| s.system_notifications,
             |s, v| s.system_notifications = v,
         ))
         .child(toggle_row(
             library,
-            "Continue after focus",
-            "Start the next break automatically",
+            "continue_after_focus",
+            "auto_start_break",
             |s| s.continue_after_focus,
             |s, v| s.continue_after_focus = v,
         ))
         .child(toggle_row(
             library,
-            "Continue after break",
-            "Start the next focus session automatically",
+            "continue_after_break",
+            "auto_start_focus",
             |s| s.continue_after_break,
             |s, v| s.continue_after_break = v,
         ))
@@ -107,7 +107,7 @@ fn card() -> View {
 fn language_setting(library: Signal<Library>) -> View {
     card()
         .child(
-            text(crate::i18n::tr("language_125"))
+            text(crate::i18n::tr("language"))
                 .flex_1()
                 .text_size(px(13.0)),
         )
@@ -121,8 +121,8 @@ fn language_setting(library: Signal<Library>) -> View {
                         }))
                     })
                     .value(move || Some(vec![library.get().settings.language.clone().into()]))
-                    .accessibility_label(crate::i18n::optional("language_125"))
-                    .placeholder(crate::i18n::optional("language_125"))
+                    .accessibility_label(crate::i18n::optional("language"))
+                    .placeholder(crate::i18n::optional("language"))
                     .on_change(move |value: &Vec<SharedString>| {
                         if let Some(value) = value.first() {
                             library.update(|data| {
@@ -225,16 +225,14 @@ fn quick_profiles(
         .items_start()
         .gap(px(8.0))
         .child(
-            text(crate::i18n::tr("Quick switch configuration profiles"))
+            text(crate::i18n::tr("quick_switch_configuration_profiles"))
                 .text_size(px(13.0))
                 .text_color(rgb(0x222222)),
         )
         .child(
-            text(crate::i18n::tr(
-                "Choose profiles for quick switching on the Timer tab and in the tray menu.",
-            ))
-            .text_size(px(11.0))
-            .text_color(rgb(GREY)),
+            text(crate::i18n::tr("quick_profiles_description"))
+                .text_size(px(11.0))
+                .text_color(rgb(GREY)),
         )
         .child(
             combobox()
@@ -255,8 +253,8 @@ fn quick_profiles(
                             .collect(),
                     )
                 })
-                .accessibility_label(crate::i18n::optional("quick_switch_profiles_131"))
-                .placeholder(crate::i18n::optional("select_profiles_132"))
+                .accessibility_label(crate::i18n::optional("quick_switch_profiles"))
+                .placeholder(crate::i18n::optional("select_profiles"))
                 .on_change(move |value: &Vec<SharedString>| {
                     let ids = value
                         .iter()

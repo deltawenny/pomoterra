@@ -50,10 +50,10 @@ impl TrayMenu {
             .map(|p| p.name.as_str())
             .unwrap_or("—");
         let phase = match timer.phase {
-            Phase::Focus => "Focus",
-            Phase::Break => "Break",
+            Phase::Focus => "focus",
+            Phase::Break => "break",
         };
-        let status = if timer.running { "Running" } else { "Paused" };
+        let status = if timer.running { "running" } else { "paused" };
         let duration = timer.duration();
         let mut profiles: Vec<_> = library
             .settings
@@ -76,7 +76,7 @@ impl TrayMenu {
         Self {
             language,
             running: timer.running,
-            profile: format!("{}: {name}", language.translate("Profile")),
+            profile: format!("{}: {name}", language.translate("profile")),
             phase: format!(
                 "{} · {}",
                 language.translate(phase),
@@ -94,7 +94,7 @@ impl TrayMenu {
     }
 
     pub(super) fn playback_label(&self) -> String {
-        self.translate(if self.running { "Stop" } else { "Play" })
+        self.translate(if self.running { "stop" } else { "play" })
     }
 
     pub(super) fn translate(&self, key: &str) -> String {
@@ -180,7 +180,7 @@ mod tests {
         assert_eq!(menu.profile, "Perfil: —");
         assert_eq!(menu.phase, "Concentración · En pausa");
         assert_eq!(menu.playback_label(), "Iniciar");
-        assert_eq!(menu.translate("Quit"), "Salir");
+        assert_eq!(menu.translate("quit"), "Salir");
         timer.skip();
         timer.toggle(std::time::Instant::now());
         let menu = TrayMenu::snapshot(&timer, &library, 0);
@@ -198,8 +198,8 @@ mod tests {
         assert_eq!(menu.profile, "Профиль: —");
         assert_eq!(menu.phase, "Работа · Пауза");
         assert_eq!(menu.playback_label(), "Запустить");
-        assert_eq!(menu.translate("Quit"), "Выйти");
-        assert_eq!(menu.translate("Switch profile"), "Сменить профиль");
+        assert_eq!(menu.translate("quit"), "Выйти");
+        assert_eq!(menu.translate("switch_profile"), "Сменить профиль");
         timer.skip();
         timer.toggle(std::time::Instant::now());
         let menu = TrayMenu::snapshot(&timer, &library, 0);

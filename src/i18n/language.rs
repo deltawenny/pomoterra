@@ -28,45 +28,23 @@ impl Language {
         }
     }
 
+    pub(crate) fn locale(self) -> &'static str {
+        match self {
+            Self::English => "en",
+            Self::Spanish => "es",
+            Self::Russian => "ru",
+        }
+    }
+
     pub(crate) fn translate(self, key: &str) -> String {
-        let catalog = match self {
-            Self::English => return key.to_owned(),
-            Self::Spanish => super::spanish::SPANISH,
-            Self::Russian => super::russian::RUSSIAN,
-        };
-        catalog
-            .iter()
-            .find(|(source, _)| *source == key)
-            .map(|(_, value)| *value)
-            .unwrap_or(key)
-            .to_owned()
+        // Explicit locales keep UI roots and native background threads independent.
+        rust_i18n::t!(key, locale = self.locale()).into_owned()
     }
 
     /// Substitute only placeholders in the template, never in inserted values.
     /// Unknown placeholders are preserved to make missing arguments visible.
     pub(crate) fn message(self, key: &str, values: &[(&str, String)]) -> String {
-        interpolate(&self.translate(key), values)
+        let (patterns, values): (Vec<_>, Vec<_>) = values.iter().cloned().unzip();
+        rust_i18n::replace_patterns(&self.translate(key), &patterns, &values)
     }
-}
-
-fn interpolate(template: &str, values: &[(&str, String)]) -> String {
-    let mut result = String::with_capacity(template.len());
-    let mut remaining = template;
-    while let Some(start) = remaining.find('{') {
-        result.push_str(&remaining[..start]);
-        let placeholder = &remaining[start..];
-        let Some(end) = placeholder.find('}') else {
-            result.push_str(placeholder);
-            return result;
-        };
-        let name = &placeholder[1..end];
-        if let Some((_, value)) = values.iter().find(|(key, _)| *key == name) {
-            result.push_str(value);
-        } else {
-            result.push_str(&placeholder[..=end]);
-        }
-        remaining = &placeholder[end + 1..];
-    }
-    result.push_str(remaining);
-    result
 }

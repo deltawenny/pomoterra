@@ -22,6 +22,7 @@ toasty-driver-sqlite = "0.11"
 tokio = { version = "1", features = ["rt", "time"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+rust-i18n = "4.2.4"
 dirs = "6"
 lucide-icons = "=1.70.0"
 

@@ -17,8 +17,8 @@ pub(crate) fn session_note(timer: Signal<TimerState>) -> View {
                     input_content()
                         .flex_1()
                         .h_full()
-                        .label(crate::i18n::tr("session_note_166"))
-                        .placeholder(crate::i18n::tr("what_are_you_focusing_on_167"))
+                        .label(crate::i18n::tr("session_note"))
+                        .placeholder(crate::i18n::tr("what_are_you_focusing_on"))
                         .value(move || timer.get().note.clone())
                         .on_change(move |value: &str| {
                             timer.update(|state| state.note = value.to_owned())
@@ -42,9 +42,9 @@ pub(crate) fn session_note(timer: Signal<TimerState>) -> View {
                 .role(AccessibilityRole::Button)
                 .label(move || {
                     if editing.get() {
-                        crate::i18n::t("save_note_168")
+                        crate::i18n::t("save_note")
                     } else {
-                        crate::i18n::t("edit_note_169")
+                        crate::i18n::t("edit_note")
                     }
                 })
                 .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))

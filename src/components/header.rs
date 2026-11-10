@@ -25,14 +25,14 @@ pub(crate) fn tab_header(selected: Signal<Tab>, timer: Signal<TimerState>) -> Vi
                 .h_full()
                 .flex_row()
                 .justify_center()
-                .child(tab(selected, timer, Tab::Config, "Config", Icon::Clock))
-                .child(tab(selected, timer, Tab::Timer, "Timer", Icon::Timer))
-                .child(tab(selected, timer, Tab::History, "History", Icon::History))
+                .child(tab(selected, timer, Tab::Config, "config", Icon::Clock))
+                .child(tab(selected, timer, Tab::Timer, "timer", Icon::Timer))
+                .child(tab(selected, timer, Tab::History, "history", Icon::History))
                 .child(tab(
                     selected,
                     timer,
                     Tab::Settings,
-                    "Settings",
+                    "settings",
                     Icon::Settings,
                 )),
         )

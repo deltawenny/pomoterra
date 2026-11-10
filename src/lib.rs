@@ -1,4 +1,6 @@
 //! A compact Pomodoro timer with configurable rules and scheduled breaks.
+rust_i18n::i18n!("locales", fallback = "en");
+
 mod components;
 mod i18n;
 mod icons;

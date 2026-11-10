@@ -41,28 +41,28 @@ pub(crate) fn config_tab(
                 .items_center()
                 .justify_between()
                 .mb(px(18.0))
-                .child(section_title("RULES"))
+                .child(section_title("rules"))
                 .child(
                     view()
                         .role(AccessibilityRole::Button)
-                        .label(crate::i18n::tr("restore_default_171"))
+                        .label(crate::i18n::tr("restore_default"))
                         .on_press(move || {
                             timer.update(|state| {
                                 state.configure(|rules| *rules = TimerRules::default())
                             })
                         })
                         .child(
-                            text(crate::i18n::tr("restore_default_171"))
+                            text(crate::i18n::tr("restore_default"))
                                 .text_size(px(13.0))
                                 .text_color(rgb(GREY)),
                         ),
                 ),
         )
-        .child(rule_slider(timer, Rule::Focus, "Stay focused", 120.0))
-        .child(rule_slider(timer, Rule::ShortBreak, "Short break", 60.0))
-        .child(rule_slider(timer, Rule::LongBreak, "Long break", 60.0))
-        .child(rule_slider(timer, Rule::Rounds, "Session rounds", 10.0))
-        .child(section_title("SPECIAL BREAKS").mt(px(9.0)).mb(px(14.0)))
+        .child(rule_slider(timer, Rule::Focus, "stay_focused_rule", 120.0))
+        .child(rule_slider(timer, Rule::ShortBreak, "short_break", 60.0))
+        .child(rule_slider(timer, Rule::LongBreak, "long_break", 60.0))
+        .child(rule_slider(timer, Rule::Rounds, "session_rounds", 10.0))
+        .child(section_title("special_breaks").mt(px(9.0)).mb(px(14.0)))
         .child(
             view()
                 .gap(px(12.0))
@@ -150,7 +150,7 @@ fn special_break(timer: Signal<TimerState>, index: usize) -> View {
                 .h_full()
                 .label(move || {
                     crate::i18n::message(
-                        "Special break {number} start time (HH:MM)",
+                        "special_break_start",
                         &[("number", (index + 1).to_string())],
                     )
                 })
@@ -170,7 +170,7 @@ fn special_break(timer: Signal<TimerState>, index: usize) -> View {
                 .border_color(rgb(0xcccccc))
                 .label(move || {
                     crate::i18n::message(
-                        "Special break {number} duration in minutes (1–180)",
+                        "special_break_duration",
                         &[("number", (index + 1).to_string())],
                     )
                 })

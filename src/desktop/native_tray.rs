@@ -73,13 +73,13 @@ impl NativeTray {
     pub(super) fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let menu = Menu::new();
         let rendered_menu = TrayMenu::current();
-        let restore = MenuItem::new(rendered_menu.translate("Restore the app"), true, None);
-        let quit = MenuItem::new(rendered_menu.translate("Quit"), true, None);
+        let restore = MenuItem::new(rendered_menu.translate("restore_the_app"), true, None);
+        let quit = MenuItem::new(rendered_menu.translate("quit"), true, None);
         let playback = MenuItem::new(rendered_menu.playback_label(), true, None);
         let profile = MenuItem::new(rendered_menu.profile.replace('&', "&&"), false, None);
         let phase = MenuItem::new(&rendered_menu.phase, false, None);
         let time = MenuItem::new(&rendered_menu.time, false, None);
-        let profiles = Submenu::new(rendered_menu.translate("Switch profile"), true);
+        let profiles = Submenu::new(rendered_menu.translate("switch_profile"), true);
         let choices = Self::populate_profiles(&profiles, &rendered_menu)?;
         menu.append_items(&[
             &profile,
@@ -133,7 +133,7 @@ impl NativeTray {
         }
         if choices.is_empty() {
             submenu.append(&MenuItem::new(
-                menu.translate("Choose quick profiles in Settings"),
+                menu.translate("choose_quick_profiles_in_settings"),
                 false,
                 None,
             ))?;
@@ -148,9 +148,9 @@ impl NativeTray {
             self.phase.set_text(&menu.phase);
             self.time.set_text(&menu.time);
             self.playback.set_text(menu.playback_label());
-            self.restore.set_text(menu.translate("Restore the app"));
-            self.quit.set_text(menu.translate("Quit"));
-            self.profiles.set_text(menu.translate("Switch profile"));
+            self.restore.set_text(menu.translate("restore_the_app"));
+            self.quit.set_text(menu.translate("quit"));
+            self.profiles.set_text(menu.translate("switch_profile"));
             if menu.profiles != self.rendered_menu.profiles
                 || menu.language != self.rendered_menu.language
             {

@@ -48,93 +48,240 @@ pub(crate) fn history_tab(library: Signal<Library>) -> impl IntoElement {
     let oldest = signal(false);
     let preview = signal(None::<Vec<Session>>);
     let displayed_sessions = move || preview.get().unwrap_or_else(|| library.get().sessions);
-    scroll().flex_1().child(view().p(px(16.0)).gap(px(16.0))
-        .child(view().flex_row().justify_between().items_center()
-            .child(text(crate::i18n::tr("focus_history_179")).text_size(px(17.0)).text_color(rgb(0x222222)))
-            .child(super::profiles::text_button("Reverse date order", move || oldest.update(|v| *v = !*v))))
-        .child(view().gap(px(6.0))
+    scroll().flex_1().child(
+        view()
+            .p(px(16.0))
+            .gap(px(16.0))
+            .child(
+                view()
+                    .flex_row()
+                    .justify_between()
+                    .items_center()
+                    .child(
+                        text(crate::i18n::tr("focus_history"))
+                            .text_size(px(17.0))
+                            .text_color(rgb(0x222222)),
+                    )
+                    .child(super::profiles::text_button(
+                        "reverse_date_order",
+                        move || oldest.update(|v| *v = !*v),
+                    )),
+            )
+            .child(
+                view()
+                    .gap(px(6.0))
+                    .child(dynamic(move || {
+                        super::profiles::text_button(
+                            if preview.get().is_some() {
+                                "show_real_history"
+                            } else {
+                                "show_sample_history"
+                            },
+                            move || {
+                                preview.set(if preview.get().is_some() {
+                                    None
+                                } else {
+                                    Some(sample::sessions(Local::now()))
+                                });
+                                profile.set(0);
+                            },
+                        )
+                    }))
+                    .child(when(
+                        move || preview.get().is_some(),
+                        || {
+                            text(crate::i18n::tr("sample_preview_notice"))
+                                .text_size(px(11.0))
+                                .text_color(rgb(BLUE))
+                        },
+                    )),
+            )
             .child(dynamic(move || {
-                super::profiles::text_button(
-                    if preview.get().is_some() { "Show real history" } else { "Show sample history" },
-                    move || {
-                        preview.set(if preview.get().is_some() { None } else { Some(sample::sessions(Local::now())) });
-                        profile.set(0);
-                    },
-                )
+                calendar(&displayed_sessions(), profile.get())
             }))
-            .child(when(move || preview.get().is_some(), || {
-                text(crate::i18n::tr("Sample preview only · saved history is unchanged.")).text_size(px(11.0)).text_color(rgb(BLUE))
-            })))
-        .child(dynamic(move || calendar(&displayed_sessions(), profile.get())))
-        .child(view().gap(px(6.0))
-            .child(view().flex_row().gap(px(6.0)).children([
-                (Period::Today, "Today"), (Period::Week, "Week"), (Period::Month, "Month"), (Period::Year, "Year"), (Period::All, "All")
-            ].into_iter().map(move |(value, title)| {
-                view().flex_1().py(px(7.0)).items_center().rounded(px(4.0))
-                    .bg(move || rgb(if period.get() == value { 0xe7f4fc } else { 0xf6f6f6 }))
-                    .role(AccessibilityRole::Button).label(move || crate::i18n::message("history_title_188", &[("title", crate::i18n::t(title))]))
-                    .on_press(move || period.set(value))
-                    .child(text(crate::i18n::tr(title)).text_size(px(11.0)).text_color(rgb(BLUE)))
-            })))
-            .child(combobox()
-                .items(move || {
-                    let data = library.get();
-                    let mut names: BTreeMap<i64, String> = displayed_sessions().iter().map(|s| (s.profile_id, s.profile_name.clone())).collect();
-                    if preview.get().is_none() {
-                        names.extend(data.profiles.iter().map(|p| (p.id, p.name.clone())));
+            .child(
+                view()
+                    .gap(px(6.0))
+                    .child(
+                        view().flex_row().gap(px(6.0)).children(
+                            [
+                                (Period::Today, "today"),
+                                (Period::Week, "week"),
+                                (Period::Month, "month"),
+                                (Period::Year, "year"),
+                                (Period::All, "all"),
+                            ]
+                            .into_iter()
+                            .map(move |(value, title)| {
+                                view()
+                                    .flex_1()
+                                    .py(px(7.0))
+                                    .items_center()
+                                    .rounded(px(4.0))
+                                    .bg(move || {
+                                        rgb(if period.get() == value {
+                                            0xe7f4fc
+                                        } else {
+                                            0xf6f6f6
+                                        })
+                                    })
+                                    .role(AccessibilityRole::Button)
+                                    .label(move || {
+                                        crate::i18n::message(
+                                            "history_title",
+                                            &[("title", crate::i18n::t(title))],
+                                        )
+                                    })
+                                    .on_press(move || period.set(value))
+                                    .child(
+                                        text(crate::i18n::tr(title))
+                                            .text_size(px(11.0))
+                                            .text_color(rgb(BLUE)),
+                                    )
+                            }),
+                        ),
+                    )
+                    .child(
+                        combobox()
+                            .items(move || {
+                                let data = library.get();
+                                let mut names: BTreeMap<i64, String> = displayed_sessions()
+                                    .iter()
+                                    .map(|s| (s.profile_id, s.profile_name.clone()))
+                                    .collect();
+                                if preview.get().is_none() {
+                                    names.extend(
+                                        data.profiles.iter().map(|p| (p.id, p.name.clone())),
+                                    );
+                                }
+                                std::iter::once(SelectItem::new(
+                                    "0",
+                                    crate::i18n::t("all_profiles"),
+                                ))
+                                .chain(sorted_items(
+                                    names
+                                        .into_iter()
+                                        .map(|(id, name)| SelectItem::new(id.to_string(), name)),
+                                ))
+                                .collect::<Vec<_>>()
+                            })
+                            .value(move || Some(vec![profile.get().to_string().into()]))
+                            .accessibility_label(crate::i18n::optional("history_profile"))
+                            .placeholder(crate::i18n::optional("search_profiles"))
+                            .on_change(move |value: &Vec<SharedString>| {
+                                if let Some(id) = value.first().and_then(|v| v.parse().ok()) {
+                                    profile.set(id);
+                                }
+                            }),
+                    )
+                    .child(
+                        view()
+                            .flex_row()
+                            .gap(px(6.0))
+                            .child(
+                                super::input::text_input(move || {
+                                    !from_date.get().trim().is_empty()
+                                        && parse_date(&from_date.get()).is_none()
+                                })
+                                .flex_1()
+                                .label(crate::i18n::tr("from_date"))
+                                .placeholder(crate::i18n::tr("yyyy_mm_dd"))
+                                .value(move || from_date.get())
+                                .on_change(move |value: &str| from_date.set(value.to_owned())),
+                            )
+                            .child(
+                                super::input::text_input(move || {
+                                    !to_date.get().trim().is_empty()
+                                        && parse_date(&to_date.get()).is_none()
+                                })
+                                .flex_1()
+                                .label(crate::i18n::tr("to_date"))
+                                .placeholder(crate::i18n::tr("yyyy_mm_dd"))
+                                .value(move || to_date.get())
+                                .on_change(move |value: &str| to_date.set(value.to_owned())),
+                            ),
+                    ),
+            )
+            .child(dynamic(move || {
+                let today = Local::now().date_naive();
+                let start = period.get().start(today);
+                let from = parse_date(&from_date.get());
+                let to = parse_date(&to_date.get());
+                let from_entered = !from_date.get().trim().is_empty();
+                let to_entered = !to_date.get().trim().is_empty();
+                let from_valid = !from_entered || from.is_some();
+                let to_valid = !to_entered || to.is_some();
+                let custom_range = from_entered || to_entered;
+                let mut sessions: Vec<_> = displayed_sessions()
+                    .into_iter()
+                    .filter(|s| {
+                        let session_date = date(s);
+                        from_valid
+                            && to_valid
+                            && (profile.get() == 0 || s.profile_id == profile.get())
+                            && session_date <= today
+                            && if custom_range {
+                                from.is_none_or(|from| session_date >= from)
+                                    && to.is_none_or(|to| session_date <= to)
+                            } else {
+                                start.is_none_or(|start| session_date >= start)
+                            }
+                    })
+                    .collect();
+                if oldest.get() {
+                    sessions.reverse();
+                }
+                let seconds: u64 = sessions.iter().map(|s| s.seconds).sum();
+                let mut earnings: BTreeMap<String, i64> = BTreeMap::new();
+                for session in &sessions {
+                    if session.rate > 0 {
+                        *earnings.entry(session.currency.clone()).or_default() +=
+                            session.earnings();
                     }
-                    std::iter::once(SelectItem::new("0", crate::i18n::t("all_profiles_189")))
-                        .chain(sorted_items(names.into_iter().map(|(id, name)| SelectItem::new(id.to_string(), name)))).collect::<Vec<_>>()
-                })
-                .value(move || Some(vec![profile.get().to_string().into()]))
-                .accessibility_label(crate::i18n::optional("history_profile_190"))
-                .placeholder(crate::i18n::optional("search_profiles_136"))
-                .on_change(move |value: &Vec<SharedString>| { if let Some(id) = value.first().and_then(|v| v.parse().ok()) { profile.set(id); } }))
-            .child(view().flex_row().gap(px(6.0))
-                .child(super::input::text_input(move || {
-                    !from_date.get().trim().is_empty() && parse_date(&from_date.get()).is_none()
-                }).flex_1().label(crate::i18n::tr("from_date_191")).placeholder(crate::i18n::tr("yyyy_mm_dd_193")).value(move || from_date.get()).on_change(move |value: &str| from_date.set(value.to_owned())))
-                .child(super::input::text_input(move || {
-                    !to_date.get().trim().is_empty() && parse_date(&to_date.get()).is_none()
-                }).flex_1().label(crate::i18n::tr("to_date_192")).placeholder(crate::i18n::tr("yyyy_mm_dd_193")).value(move || to_date.get()).on_change(move |value: &str| to_date.set(value.to_owned())))))
-        .child(dynamic(move || {
-            let today = Local::now().date_naive();
-            let start = period.get().start(today);
-            let from = parse_date(&from_date.get());
-            let to = parse_date(&to_date.get());
-            let from_entered = !from_date.get().trim().is_empty();
-            let to_entered = !to_date.get().trim().is_empty();
-            let from_valid = !from_entered || from.is_some();
-            let to_valid = !to_entered || to.is_some();
-            let custom_range = from_entered || to_entered;
-            let mut sessions: Vec<_> = displayed_sessions().into_iter()
-                .filter(|s| {
-                    let session_date = date(s);
-                    from_valid && to_valid
-                        && (profile.get() == 0 || s.profile_id == profile.get())
-                        && session_date <= today
-                        && if custom_range {
-                            from.is_none_or(|from| session_date >= from)
-                                && to.is_none_or(|to| session_date <= to)
+                }
+                let empty = sessions.is_empty();
+                view()
+                    .gap(px(14.0))
+                    .child(
+                        text(crate::i18n::message(
+                            "session_totals",
+                            &[
+                                ("count", sessions.len().to_string()),
+                                ("hours", (seconds / 3600).to_string()),
+                                ("minutes", (seconds % 3600 / 60).to_string()),
+                            ],
+                        ))
+                        .text_size(px(14.0))
+                        .text_color(rgb(0x333333)),
+                    )
+                    .children(earnings.into_iter().map(|(currency, amount)| {
+                        text(crate::i18n::message(
+                            "amount_currency_earned",
+                            &[("amount", money(amount)), ("currency", currency)],
+                        ))
+                        .text_size(px(12.0))
+                        .text_color(rgb(0x008c69))
+                    }))
+                    .child(profile_chart(&sessions))
+                    .child(
+                        text(if oldest.get() {
+                            crate::i18n::t("sessions_oldest_first")
                         } else {
-                            start.is_none_or(|start| session_date >= start)
-                        }
-                }).collect();
-            if oldest.get() { sessions.reverse(); }
-            let seconds: u64 = sessions.iter().map(|s| s.seconds).sum();
-            let mut earnings: BTreeMap<String, i64> = BTreeMap::new();
-            for session in &sessions {
-                if session.rate > 0 { *earnings.entry(session.currency.clone()).or_default() += session.earnings(); }
-            }
-            let empty = sessions.is_empty();
-            view().gap(px(14.0))
-                .child(text(crate::i18n::message("{count} sessions · {hours}h {minutes}m", &[("count", sessions.len().to_string()), ("hours", (seconds / 3600).to_string()), ("minutes", (seconds % 3600 / 60).to_string())])).text_size(px(14.0)).text_color(rgb(0x333333)))
-                .children(earnings.into_iter().map(|(currency, amount)| text(crate::i18n::message("{amount} {currency} earned", &[("amount", money(amount)), ("currency", currency)])).text_size(px(12.0)).text_color(rgb(0x008c69))))
-                .child(profile_chart(&sessions))
-                .child(text(if oldest.get() { crate::i18n::t("sessions_oldest_first_194") } else { crate::i18n::t("sessions_newest_first") }).text_size(px(11.0)))
-                .child(when(move || empty, || text(crate::i18n::tr("No completed focus sessions in this period. Finish a focus session to start your history.")).text_size(px(13.0)).text_color(rgb(GREY))))
-                .children(sessions.into_iter().map(session_row))
-        })))
+                            crate::i18n::t("sessions_newest_first")
+                        })
+                        .text_size(px(11.0)),
+                    )
+                    .child(when(
+                        move || empty,
+                        || {
+                            text(crate::i18n::tr("history_empty"))
+                                .text_size(px(13.0))
+                                .text_color(rgb(GREY))
+                        },
+                    ))
+                    .children(sessions.into_iter().map(session_row))
+            })),
+    )
 }
 
 fn parse_date(value: &str) -> Option<NaiveDate> {
@@ -162,7 +309,7 @@ fn calendar(sessions: &[Session], profile_id: i64) -> View {
         .gap(px(8.0))
         .child(
             text(crate::i18n::message(
-                "{count} focus sessions in the last year",
+                "year_focus_sessions",
                 &[("count", count.to_string())],
             ))
             .text_size(px(12.0)),
@@ -177,7 +324,7 @@ fn calendar(sessions: &[Session], profile_id: i64) -> View {
                             let week_start =
                                 start.checked_add_days(Days::new(week as u64 * 7)).unwrap();
                             let label = if week == 0 || week_start.day() <= 7 {
-                                week_start.format("%b").to_string()
+                                week_start.format("%b").to_string().to_lowercase()
                             } else {
                                 String::new()
                             };
@@ -220,7 +367,7 @@ fn calendar(sessions: &[Session], profile_id: i64) -> View {
                                                     |s| s.opacity(0.0),
                                                 )
                                                 .label(crate::i18n::message(
-                                                    "{date}: {count} completed focus sessions",
+                                                    "day_focus_sessions",
                                                     &[
                                                         ("date", current.to_string()),
                                                         ("count", n.to_string()),
@@ -233,12 +380,7 @@ fn calendar(sessions: &[Session], profile_id: i64) -> View {
                 ),
             ),
         )
-        .child(
-            text(crate::i18n::tr(
-                "Less  ░ ▒ ▓ █  More · colors show profiles",
-            ))
-            .text_size(px(10.0)),
-        )
+        .child(text(crate::i18n::tr("calendar_legend")).text_size(px(10.0)))
 }
 
 fn tint(color: u32, strength: f64) -> u32 {
@@ -326,7 +468,7 @@ fn session_row(session: Session) -> View {
                 format!(
                     "{} {} {}",
                     completed.format("%d"),
-                    crate::i18n::t(&completed.format("%b").to_string()),
+                    crate::i18n::t(&completed.format("%b").to_string().to_lowercase()),
                     completed.format("%Y")
                 ),
                 started.format("%H:%M"),
@@ -337,7 +479,7 @@ fn session_row(session: Session) -> View {
         )
         .child(
             text(if session.note.is_empty() {
-                crate::i18n::t("focus_session_197")
+                crate::i18n::t("focus_session")
             } else {
                 session.note.clone()
             })

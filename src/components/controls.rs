@@ -22,13 +22,13 @@ pub(crate) fn timer_controls(timer: Signal<TimerState>, announcements: Signal<bo
                 .items_center()
                 .justify_center()
                 .gap(px(4.0))
-                .child(control(timer, "Reset timer", Icon::RotateCcw, move || {
+                .child(control(timer, "reset_timer", Icon::RotateCcw, move || {
                     timer.update(TimerState::reset)
                 }))
                 .child(play_pause_button(timer))
                 .child(control(
                     timer,
-                    "Skip session",
+                    "skip_session",
                     Icon::SkipForward,
                     move || timer.update(TimerState::skip),
                 ))
@@ -36,7 +36,7 @@ pub(crate) fn timer_controls(timer: Signal<TimerState>, announcements: Signal<bo
         )
         .child(control(
             timer,
-            "Toggle full screen",
+            "toggle_full_screen",
             Icon::Maximize,
             desktop::toggle_full_screen,
         ))
@@ -55,7 +55,7 @@ fn session_counter(timer: Signal<TimerState>) -> View {
             })
             .text_size(px(14.0)),
         )
-        .child(text(crate::i18n::tr("sessions_106")).text_size(move || {
+        .child(text(crate::i18n::tr("sessions")).text_size(move || {
             px(
                 if crate::i18n::language() != crate::i18n::Language::English {
                     12.0
@@ -87,9 +87,9 @@ fn play_pause_button(timer: Signal<TimerState>) -> View {
         .role(AccessibilityRole::Button)
         .label(move || {
             if timer.get().running {
-                crate::i18n::t("pause_timer_161")
+                crate::i18n::t("pause_timer")
             } else {
-                crate::i18n::t("start_timer_162")
+                crate::i18n::t("start_timer")
             }
         })
         .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))
@@ -119,9 +119,9 @@ fn announcement_toggle(timer: Signal<TimerState>, announcements: Signal<bool>) -
         .role(AccessibilityRole::Button)
         .label(move || {
             if announcements.get() {
-                crate::i18n::t("mute_announcements_163")
+                crate::i18n::t("mute_announcements")
             } else {
-                crate::i18n::t("enable_announcements_164")
+                crate::i18n::t("enable_announcements")
             }
         })
         .on_mouse_enter(move |_: &MouseEvent| hovered.set(true))

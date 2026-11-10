@@ -40,7 +40,7 @@ pub(super) fn combobox() -> ComboboxElement {
         )
         .render_item(option_content)
         .empty(
-            text(crate::i18n::tr("no_matching_profiles_133"))
+            text(crate::i18n::tr("no_matching_profiles"))
                 .text_size(px(12.0))
                 .text_color(rgb(GREY))
                 .p(px(12.0)),

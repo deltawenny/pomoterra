@@ -53,8 +53,8 @@ pub(crate) fn timer_display(timer: Signal<TimerState>) -> View {
                 )
                 .child(
                     text(move || match timer.get().phase {
-                        Phase::Focus => crate::i18n::t("stay_focused_156"),
-                        Phase::Break => crate::i18n::t("take_a_break_157"),
+                        Phase::Focus => crate::i18n::t("stay_focused"),
+                        Phase::Break => crate::i18n::t("take_a_break"),
                     })
                     .text_size(px(18.0))
                     .mt(px(3.0)),

@@ -19,8 +19,8 @@ pub(crate) fn request_show() {
 /// Notification services may block; never call them on the timer/UI thread.
 pub(crate) fn notify_completion(phase: crate::store::Phase, language: crate::i18n::Language) {
     let body = match phase {
-        crate::store::Phase::Focus => "Focus session complete. Time for a break.",
-        crate::store::Phase::Break => "Break complete. Your next focus session is ready.",
+        crate::store::Phase::Focus => "focus_complete",
+        crate::store::Phase::Break => "break_complete",
     };
     let body = language.translate(body);
     let _ = std::thread::Builder::new()
